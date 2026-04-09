@@ -1,2 +1,0 @@
-/var/folders/zd/7_390fb93_bbq6jcs2h5gl140000gn/T/tmpv1i35v62: line 18: timeout: command not found
-ERROR conda.cli.main_run:execute(142): `conda run timeout 4 python main.py` failed. (See above for error)
