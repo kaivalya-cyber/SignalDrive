@@ -56,6 +56,21 @@ COLOR_RED     = (  0,   0, 255)   # reverse indicator
 COLOR_OVERLAY = (  0,   0,   0)   # semi-transparent panel background (applied with alpha)
 ALPHA_OVERLAY = 0.6               # opacity of dark HUD panels
 
+# ── Render Quality ─────────────────────────────────────────────────────────────
+# Controls 3D rendering cost on lower-end machines.
+# Options:
+#   "high"   — 640×480 render, every frame
+#   "medium" — 320×240 render, every frame
+#   "low"    — 320×240 render, every 2nd frame (reuses last frame in between)
+RENDER_QUALITY = "high"
+
+# Internal lookup: maps quality -> (render_width, render_height, frame_skip)
+_RENDER_PRESETS = {
+    "high":   (640, 480, 0),
+    "medium": (320, 240, 0),
+    "low":    (320, 240, 1),
+}
+
 # ── PyBullet Camera ───────────────────────────────────────────────────────────
 CAM_DISTANCE      = 4.0    # meters behind car
 CAM_PITCH         = -20.0  # degrees (negative = looking down)

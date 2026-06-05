@@ -20,7 +20,8 @@ import cv2
 from config import (
     CAMERA_WIDTH, CAMERA_HEIGHT,
     CAM_DISTANCE, CAM_PITCH, CAM_FOV, CAM_NEAR, CAM_FAR,
-    MAX_STEERING_RAD, FORWARD_VELOCITY, REVERSE_VELOCITY, BRAKE_VELOCITY
+    MAX_STEERING_RAD, FORWARD_VELOCITY, REVERSE_VELOCITY, BRAKE_VELOCITY,
+    RENDER_QUALITY, _RENDER_PRESETS
 )
 
 
@@ -76,6 +77,10 @@ class CarSim:
         self._prev_pos      = np.array([0.0, 0.0, 0.1])
         self._prev_time     = 0.0
         self._speed_history = []
+
+        # Frame-skipping state for low-render-quality path
+        self._render_counter = 0
+        self._last_frame     = None
 
     def _spawn_obstacles(self):
         """
@@ -222,11 +227,21 @@ class CarSim:
         Render a third-person follow camera frame from PyBullet.
 
         The camera follows the car from behind and above, always pointing at the car.
-        Uses PyBullet's getCameraImage with ER_TINY_RENDERER for speed.
+        Resolution and frame-skip rate are controlled by RENDER_QUALITY in config.
 
         Returns:
             np.ndarray: BGR image of shape (CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=uint8
         """
+        rw, rh, skip = _RENDER_PRESETS.get(RENDER_QUALITY, (640, 480, 0))
+
+        # Frame skipping: reuse last frame on skip frames
+        if skip > 0 and self._last_frame is not None:
+            self._render_counter += 1
+            if self._render_counter > skip:
+                self._render_counter = 0
+            else:
+                return self._last_frame
+
         # Get car position and yaw for camera positioning
         pos, orient = p.getBasePositionAndOrientation(self.car_id)
         euler        = p.getEulerFromQuaternion(orient)
@@ -254,20 +269,20 @@ class CarSim:
             farVal=CAM_FAR
         )
 
-        # Render — returns (width, height, rgbPixels, depthPixels, segmentationMaskBuffer)
+        # Render at quality-specified resolution
         _, _, rgb_pixels, _, _ = p.getCameraImage(
-            width=640,
-            height=480,
+            width=rw,
+            height=rh,
             viewMatrix=view_matrix,
             projectionMatrix=proj_matrix,
-            renderer=p.ER_TINY_RENDERER  # faster than OpenGL renderer for this use case
+            renderer=p.ER_TINY_RENDERER
         )
 
-        # rgb_pixels is a flat list of RGBA values — reshape and convert to BGR
-        rgba_image = np.array(rgb_pixels, dtype=np.uint8).reshape(480, 640, 4)
+        rgba_image = np.array(rgb_pixels, dtype=np.uint8).reshape(rh, rw, 4)
         bgr_image  = cv2.cvtColor(rgba_image, cv2.COLOR_RGBA2BGR)
-        bgr_image  = cv2.resize(bgr_image, (CAMERA_WIDTH, CAMERA_HEIGHT))  # upscale after
+        bgr_image  = cv2.resize(bgr_image, (CAMERA_WIDTH, CAMERA_HEIGHT), interpolation=cv2.INTER_NEAREST)
 
+        self._last_frame = bgr_image
         return bgr_image
 
     def reset(self):
