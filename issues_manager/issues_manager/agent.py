@@ -24,7 +24,9 @@ Issues:
 Pull Requests:
 - list_pull_requests: List/filter PRs
 - view_pull_request: View PR details (diff stats, reviews, files)
+- create_pull_request: Create a PR from current branch
 - merge_pull_request: Merge PRs (merge/squash/rebase)
+- add_pr_review: Submit a review (APPROVE/COMMENT/REQUEST_CHANGES)
 
 Labels:
 - list_labels: List repo labels
@@ -32,6 +34,12 @@ Labels:
 
 Milestones:
 - list_milestones: List repo milestones
+
+Repository:
+- get_repo_info: Get repo stats, languages, topics, health overview
+
+Other:
+- add_issue_assignees: Add assignees to an issue
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.

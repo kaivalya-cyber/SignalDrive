@@ -689,3 +689,190 @@ def list_milestones(repo: str = "", state: str = "open") -> str:
         if m.get("description"):
             lines.append(f"  {m['description']}")
     return "\n".join(lines)
+
+
+@tool(
+    name="create_pull_request",
+    description="Create a pull request from the current branch or specified head branch.",
+    parameters={
+        "title": {
+            "type": "string",
+            "description": "PR title.",
+        },
+        "body": {
+            "type": "string",
+            "description": "PR body/description.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "head": {
+            "type": "string",
+            "description": "Head branch name (defaults to current branch).",
+        },
+        "base": {
+            "type": "string",
+            "description": "Base branch name (defaults to default branch).",
+        },
+        "draft": {
+            "type": "boolean",
+            "description": "Create as draft PR.",
+        },
+        "labels": {
+            "type": "string",
+            "description": "Comma-separated label names.",
+        },
+        "assignees": {
+            "type": "string",
+            "description": "Comma-separated GitHub usernames.",
+        },
+    },
+    required=["title"],
+)
+def create_pull_request(title: str, body: str = "", repo: str = "", head: str = "", base: str = "", draft: bool = False, labels: str = "", assignees: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "create", "--title", title]
+    if body:
+        args += ["--body", body]
+    if repo:
+        args += ["--repo", repo]
+    if head:
+        args += ["--head", head]
+    if base:
+        args += ["--base", base]
+    if draft:
+        args.append("--draft")
+    if labels:
+        for l in labels.split(","):
+            l = l.strip()
+            if l:
+                args += ["--label", l]
+    if assignees:
+        for a in assignees.split(","):
+            a = a.strip()
+            if a:
+                args += ["--assignee", a]
+    try:
+        url = _gh(*args).strip()
+        number = url.rstrip("/").split("/")[-1]
+        return f"Created PR #{number}: {url}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="add_pr_review",
+    description="Submit a review on a pull request (approve, comment, or request changes).",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "body": {
+            "type": "string",
+            "description": "Review comment body.",
+        },
+        "event": {
+            "type": "string",
+            "enum": ["APPROVE", "COMMENT", "REQUEST_CHANGES"],
+            "description": "Review event type.",
+        },
+    },
+    required=["number", "event"],
+)
+def add_pr_review(number: int, repo: str = "", body: str = "", event: str = "COMMENT") -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "review", str(number), "--request", event]
+    if body:
+        args += ["--body", body]
+    try:
+        _gh(*args, repo=repo)
+        return f"Submitted {event} review on PR #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="add_issue_assignees",
+    description="Add assignees to a GitHub issue.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "assignees": {
+            "type": "string",
+            "description": "Comma-separated GitHub usernames to assign.",
+        },
+    },
+    required=["number", "assignees"],
+)
+def add_issue_assignees(number: int, repo: str = "", assignees: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["issue", "edit", str(number)]
+    for a in assignees.split(","):
+        a = a.strip()
+        if a:
+            args += ["--add-assignee", a]
+    try:
+        _gh(*args, repo=repo)
+        return f"Added assignees to issue #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_info",
+    description="Get repository metadata, stats, and health overview.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_repo_info(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("repo", "view", "--json",
+                        "name,owner,description,url,defaultBranch,createdAt,updatedAt,pushedAt,homepageUrl,stargazerCount,forkCount,openIssueCount,openPullRequestCount,languages,topics,isFork,isArchived,licenseInfo,milestones",
+                        repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    owner = data.get("owner", {}).get("login", "?")
+    langs = ", ".join(data.get("languages", [])) if data.get("languages") else "none"
+    topics = ", ".join(data.get("topics", [])) if data.get("topics") else "none"
+    license_name = data.get("licenseInfo", {}).get("name", "none") if data.get("licenseInfo") else "none"
+    milestones = data.get("milestones", {}).get("totalCount", 0)
+
+    status = "archived" if data.get("isArchived") else ("fork" if data.get("isFork") else "active")
+
+    lines = [
+        f"# {owner}/{data['name']}",
+        f"**Description:** {data.get('description', 'No description')}",
+        f"**Status:** {status}",
+        f"**Default branch:** {data['defaultBranch']}",
+        f"**License:** {license_name}",
+        f"**Stars:** {data.get('stargazerCount', 0)}",
+        f"**Forks:** {data.get('forkCount', 0)}",
+        f"**Open issues:** {data.get('openIssueCount', 0)}",
+        f"**Open PRs:** {data.get('openPullRequestCount', 0)}",
+        f"**Milestones:** {milestones}",
+        f"**Topics:** {topics}",
+        f"**Languages:** {langs}",
+        f"**Created:** {data.get('createdAt', '?')}",
+        f"**Last push:** {data.get('pushedAt', '?')}",
+        f"**URL:** {data.get('url', '')}",
+    ]
+    return "\n".join(lines)

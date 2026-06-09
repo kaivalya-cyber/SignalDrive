@@ -44,8 +44,14 @@ List pull requests.
 ### `gh pr view <number> [--repo <owner/repo>] [--json <fields>]`
 View PR details: diff stats, reviews, files changed.
 
+### `gh pr create --title "<title>" [--body "<body>"] [--head <branch>] [--base <branch>] [--draft] [--label <name>] [--assignee <user>] [--repo <owner/repo>]`
+Create a pull request.
+
 ### `gh pr merge <number> [--repo <owner/repo>] [--merge|--squash|--rebase] [--delete-branch]`
 Merge a pull request.
+
+### `gh pr review <number> [--request APPROVE|COMMENT|REQUEST_CHANGES] [--body "<body>"] [--repo <owner/repo>]`
+Submit a PR review.
 
 ## Label commands
 
@@ -60,16 +66,26 @@ Create a new label.
 ### `gh api repos/<owner>/<repo>/milestones?state=<state>`
 List milestones (use the API directly).
 
+## Repository commands
+
+### `gh repo view [--repo <owner/repo>] [--json name,description,stargazerCount,forkCount,openIssueCount,openPullRequestCount,languages,topics]`
+View repository info and stats.
+
+## Other commands
+
+### `gh issue edit <number> --add-assignee <user> [--repo <owner/repo>]`
+Assign an issue to a user.
+
 ## Workflow
 
 1. Ask which repository if not obvious (default: current repo from git remote).
 2. List issues/PRs with relevant filters before creating duplicates.
-3. When creating issues, ask for title/body if not provided.
+3. When creating issues or PRs, ask for title/body if not provided.
 4. Use `--json` flag for structured output.
 
 ## Rules
 
-- Always confirm before destructive actions (close, merge, remove labels, unassign).
+- Always confirm before destructive actions (close, merge, remove labels, unassign, request changes).
 - Default to `--state open` / `--limit 20` unless specified otherwise.
 - When the user references an issue by number, resolve it to the current repo.
 - Detect the repo from `git remote get-url origin` if `--repo` is not specified.
