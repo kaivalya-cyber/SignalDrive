@@ -60,6 +60,15 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 3. Tools execute via the `gh` CLI
 4. Results go back to the LLM for a final response
 
+## Tools
+
+| Category     | Tools |
+|-------------|-------|
+| Issues      | `list_issues`, `view_issue`, `create_issue`, `close_issue`, `reopen_issue`, `comment_on_issue`, `edit_issue`, `search_issues` |
+| Pull Requests | `list_pull_requests`, `view_pull_request`, `merge_pull_request` |
+| Labels      | `list_labels`, `create_label` |
+| Milestones  | `list_milestones` |
+
 ## Architecture
 
 ```
@@ -71,8 +80,8 @@ issues-manager
 │   │   ├── base.py
 │   │   ├── openai_compat.py
 │   │   └── anthropic_provider.py
-│   └── tools/           # GitHub issue tools
-│       ├── github.py    # All issue operations via gh CLI
+│   └── tools/           # GitHub issue/PR tools
+│       ├── github.py    # All operations via gh CLI
 │       └── __init__.py  # Tool registry
 └── pyproject.toml        # Package config
 ```

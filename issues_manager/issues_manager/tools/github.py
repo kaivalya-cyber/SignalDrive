@@ -20,6 +20,14 @@ def _gh(*args: str, timeout: int = 30) -> str:
     return result.stdout
 
 
+def _gh_json(*args: str, timeout: int = 30, repo: str = "") -> list | dict:
+    args = list(args)
+    if repo:
+        args += ["--repo", repo]
+    out = _gh(*args, timeout=timeout)
+    return json.loads(out)
+
+
 def _get_repo() -> str:
     """Detect the current repo from git remote if --repo not given."""
     try:
@@ -428,4 +436,256 @@ def search_issues(query: str, repo: str = "", limit: int = 20) -> str:
         repo_name = r.get("repository", {}).get("nameWithOwner", "")
         labels_str = f" [{', '.join(l['name'] for l in r['labels'])}]" if r["labels"] else ""
         lines.append(f"- [{repo_name}] **#{r['number']}** [{r['state']}] {r['title']}{labels_str}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_pull_requests",
+    description="List GitHub pull requests with optional filters.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "closed", "merged", "all"],
+            "description": "Filter by PR state.",
+        },
+        "label": {
+            "type": "string",
+            "description": "Filter by label name.",
+        },
+        "assignee": {
+            "type": "string",
+            "description": "Filter by assignee login.",
+        },
+        "author": {
+            "type": "string",
+            "description": "Filter by author login.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_pull_requests(repo: str = "", state: str = "open", label: str = "", assignee: str = "", author: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "list", "--state", state, "--limit", str(limit),
+            "--json", "number,title,state,headRefName,baseRefName,author,labels,createdAt,url"]
+    if label:
+        args += ["--label", label]
+    if assignee:
+        args += ["--assignee", assignee]
+    if author:
+        args += ["--author", author]
+    try:
+        prs = _gh_json(*args, repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not prs:
+        return "No pull requests found."
+
+    lines = []
+    for pr in prs:
+        labels_str = f" [{', '.join(l['name'] for l in pr['labels'])}]" if pr.get("labels") else ""
+        author_str = pr.get("author", {}).get("login", "unknown") if pr.get("author") else "unknown"
+        lines.append(f"- **#{pr['number']}** [{pr['state']}] {pr['title']} ({pr['headRefName']} → {pr['baseRefName']}) by {author_str}{labels_str}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="view_pull_request",
+    description="View full details of a specific GitHub pull request, including diff summary and reviews.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def view_pull_request(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        pr = _gh_json("pr", "view", str(number), "--json",
+                       "number,title,state,body,headRefName,baseRefName,author,labels,assignees,mergedBy,createdAt,updatedAt,mergedAt,additions,deletions,files,reviews,url",
+                       repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    labels_str = ", ".join(l["name"] for l in pr["labels"]) if pr.get("labels") else "none"
+    assignees_str = ", ".join(a["login"] for a in pr["assignees"]) if pr.get("assignees") else "none"
+    author_str = pr.get("author", {}).get("login", "unknown")
+    files_count = len(pr.get("files", []))
+    reviews = pr.get("reviews", [])
+
+    lines = [
+        f"## #{pr['number']} [{pr['state']}] {pr['title']}",
+        f"**Author:** {author_str}",
+        f"**Branch:** {pr['headRefName']} → {pr['baseRefName']}",
+        f"**Labels:** {labels_str}",
+        f"**Assignees:** {assignees_str}",
+        f"**Changes:** +{pr.get('additions', 0)} / -{pr.get('deletions', 0)} across {files_count} files",
+        f"**Created:** {pr['createdAt']}",
+        f"**Updated:** {pr['updatedAt']}",
+        f"**URL:** {pr['url']}",
+        "",
+        pr.get("body", "_No description_"),
+    ]
+
+    if pr.get("mergedBy"):
+        lines.append(f"\n**Merged by:** {pr['mergedBy']['login']} at {pr.get('mergedAt', 'unknown')}")
+
+    if reviews:
+        lines.append("")
+        lines.append("### Reviews")
+        for r in reviews:
+            reviewer = r.get("author", {}).get("login", "unknown")
+            state = r.get("state", "COMMENTED")
+            body = r.get("body", "")
+            lines.append(f"**{reviewer}** ({state}): {body[:200]}" + ("..." if len(body) > 200 else ""))
+
+    return "\n".join(lines)
+
+
+@tool(
+    name="merge_pull_request",
+    description="Merge a GitHub pull request. Supports merge, squash, and rebase strategies.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number to merge.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "method": {
+            "type": "string",
+            "enum": ["merge", "squash", "rebase"],
+            "description": "Merge method (default: merge).",
+        },
+        "delete_branch": {
+            "type": "boolean",
+            "description": "Delete the head branch after merge.",
+        },
+    },
+    required=["number"],
+)
+def merge_pull_request(number: int, repo: str = "", method: str = "merge", delete_branch: bool = False) -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "merge", str(number), "--" + method]
+    if delete_branch:
+        args.append("--delete-branch")
+    try:
+        _gh(*args, repo=repo)
+        return f"Merged PR #{number} using {method} strategy"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_labels",
+    description="List all labels in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_labels(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        labels = _gh_json("label", "list", "--json", "name,color,description", repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not labels:
+        return "No labels found."
+
+    lines = []
+    for l in labels:
+        desc = f" — {l['description']}" if l.get("description") else ""
+        lines.append(f"- `{l['name']}` (color: #{l['color']}){desc}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_label",
+    description="Create a new label in a repository.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Label name.",
+        },
+        "color": {
+            "type": "string",
+            "description": "Hex color code without # (e.g. 'ff0000').",
+        },
+        "description": {
+            "type": "string",
+            "description": "Label description.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name", "color"],
+)
+def create_label(name: str, color: str, description: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["label", "create", name, "--color", color]
+    if description:
+        args += ["--description", description]
+    try:
+        _gh(*args, repo=repo)
+        return f"Created label '{name}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_milestones",
+    description="List milestones in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "closed", "all"],
+            "description": "Filter by state.",
+        },
+    },
+    required=[],
+)
+def list_milestones(repo: str = "", state: str = "open") -> str:
+    repo = repo or _get_repo()
+    try:
+        milestones = _gh_json("api", f"repos/{repo}/milestones?state={state}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not milestones:
+        return "No milestones found."
+
+    lines = []
+    for m in milestones:
+        progress = f" ({m.get('open_issues', 0)} open / {m.get('closed_issues', 0)} closed)"
+        due = f" due {m['due_on']}" if m.get("due_on") else ""
+        lines.append(f"- **{m['title']}** [{m['state']}]{due}{progress}")
+        if m.get("description"):
+            lines.append(f"  {m['description']}")
     return "\n".join(lines)
