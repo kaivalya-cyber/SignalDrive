@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "github-issues-manager"
+version = "0.1.0"
+description = "AI agent that manages GitHub issues using any LLM provider"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+  { name = "kaivalya-cyber" },
+]
+requires-python = ">=3.11"
+dependencies = [
+  "openai>=1.0.0",
+  "anthropic>=0.30.0",
+  "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+issues-manager = "issues_manager.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.3.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["issues_manager"]
