@@ -71,10 +71,40 @@ List milestones (use the API directly).
 ### `gh repo view [--repo <owner/repo>] [--json name,description,stargazerCount,forkCount,openIssueCount,openPullRequestCount,languages,topics]`
 View repository info and stats.
 
+## Release commands
+
+### `gh release list [--repo <owner/repo>] [--limit <N>] [--json tagName,name,isDraft,isPrerelease,createdAt]`
+List releases.
+
+### `gh release create <tag> --title "<title>" [--notes "<body>"] [--target <branch>] [--draft] [--prerelease] [--repo <owner/repo>]`
+Create a new release.
+
+## Workflow commands
+
+### `gh run list [--repo <owner/repo>] [--limit <N>] [--json name,headBranch,status,conclusion,workflow]`
+List GitHub Actions workflow runs.
+
+## Branch commands
+
+### `gh api repos/<owner>/<repo>/branches?per_page=<N>`
+List branches in a repository.
+
+### `gh api repos/<owner>/<repo>/git/refs/heads/<branch> --method DELETE`
+Delete a branch.
+
 ## Other commands
 
 ### `gh issue edit <number> --add-assignee <user> [--repo <owner/repo>]`
 Assign an issue to a user.
+
+### `gh api repos/<owner>/<repo>/issues/<number>/lock --method PUT --raw-field lock_reason=<reason>`
+Lock issue/PR conversation (resolved, spam, off_topic, too_heated).
+
+### `gh api repos/<owner>/<repo>/issues/<number>/lock --method DELETE`
+Unlock issue/PR conversation.
+
+### `gh api user`
+Show authenticated GitHub user info.
 
 ## Workflow
 

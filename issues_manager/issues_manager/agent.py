@@ -35,11 +35,23 @@ Labels:
 Milestones:
 - list_milestones: List repo milestones
 
+Releases:
+- list_releases: List releases with draft/pre-release badges
+- create_release: Create a new release with tag, notes, draft, prerelease
+
+Workflows:
+- list_workflow_runs: List GitHub Actions runs with status/conclusion
+
 Repository:
-- get_repo_info: Get repo stats, languages, topics, health overview
+- get_repo_info: Repo stats (stars, forks, languages, topics, issues, PRs)
+- list_branches: List branches with protection status
+- delete_branch: Delete a branch after merge
+- whoami: Show the authenticated GitHub user
 
 Other:
 - add_issue_assignees: Add assignees to an issue
+- lock_issue: Lock conversation on an issue/PR (off_topic, too_heated, resolved, spam)
+- unlock_issue: Unlock conversation on an issue/PR
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.

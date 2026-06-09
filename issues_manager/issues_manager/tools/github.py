@@ -876,3 +876,282 @@ def get_repo_info(repo: str = "") -> str:
         f"**URL:** {data.get('url', '')}",
     ]
     return "\n".join(lines)
+
+
+@tool(
+    name="whoami",
+    description="Show the currently authenticated GitHub user.",
+    parameters={},
+    required=[],
+)
+def whoami() -> str:
+    try:
+        user = _gh_json("api", "user", timeout=10)
+        lines = [
+            f"**Logged in as:** {user.get('login', '?')}",
+            f"**Name:** {user.get('name', 'N/A')}",
+            f"**Bio:** {user.get('bio', 'N/A')}",
+            f"**Public repos:** {user.get('public_repos', 0)}",
+            f"**Public gists:** {user.get('public_gists', 0)}",
+            f"**Followers:** {user.get('followers', 0)} / **Following:** {user.get('following', 0)}",
+            f"**Profile:** {user.get('html_url', '')}",
+        ]
+        return "\n".join(lines)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_workflow_runs",
+    description="List recent GitHub Actions workflow runs with their status and conclusion.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "branch": {
+            "type": "string",
+            "description": "Filter by branch name.",
+        },
+        "status": {
+            "type": "string",
+            "enum": ["", "queued", "in_progress", "completed", "action_required", "cancelled", "failure", "neutral", "skipped", "stale", "success", "timed_out"],
+            "description": "Filter by run status or conclusion.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_workflow_runs(repo: str = "", branch: str = "", status: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("run", "list", "--limit", str(limit), repo=repo, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    runs = data.get("workflow_runs", data) if isinstance(data, dict) else data
+    if not runs:
+        return "No workflow runs found."
+
+    lines = []
+    for r in (runs if isinstance(runs, list) else []):
+        if branch and r.get("headBranch", "") != branch:
+            continue
+        if status and r.get("status", "") != status and r.get("conclusion", "") != status:
+            continue
+        name = r.get("name", r.get("workflow", {}).get("name", "?"))
+        conclusion = r.get("conclusion", r.get("status", "?"))
+        branch_name = r.get("headBranch", "?")
+        icon = {"success": "✓", "failure": "✗", "cancelled": "—", "in_progress": "►"}.get(conclusion, "•")
+        lines.append(f"- {icon} **{name}** ({branch_name}) → `{conclusion}`")
+    return "\n".join(lines) if lines else "No matching runs found."
+
+
+@tool(
+    name="list_releases",
+    description="List releases in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_releases(repo: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    try:
+        releases = _gh_json("release", "list", "--limit", str(limit),
+                            "--json", "tagName,name,isDraft,isPrerelease,createdAt,url",
+                            repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not releases:
+        return "No releases found."
+
+    lines = []
+    for r in releases:
+        tag = r.get("tagName", "?")
+        name = r.get("name", tag)
+        badges = []
+        if r.get("isDraft"):
+            badges.append("draft")
+        if r.get("isPrerelease"):
+            badges.append("pre-release")
+        badge_str = f" [{', '.join(badges)}]" if badges else ""
+        lines.append(f"- **{name}** (`{tag}`){badge_str} — {r.get('createdAt', '?')}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_release",
+    description="Create a new release in a repository.",
+    parameters={
+        "tag": {
+            "type": "string",
+            "description": "Tag name for the release (e.g. v1.0.0).",
+        },
+        "name": {
+            "type": "string",
+            "description": "Release title.",
+        },
+        "notes": {
+            "type": "string",
+            "description": "Release notes/body.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "target": {
+            "type": "string",
+            "description": "Commit SHA or branch to target (defaults to default branch).",
+        },
+        "draft": {
+            "type": "boolean",
+            "description": "Create as a draft release.",
+        },
+        "prerelease": {
+            "type": "boolean",
+            "description": "Mark as pre-release.",
+        },
+    },
+    required=["tag"],
+)
+def create_release(tag: str, name: str = "", notes: str = "", repo: str = "", target: str = "", draft: bool = False, prerelease: bool = False) -> str:
+    repo = repo or _get_repo()
+    args = ["release", "create", tag, "--title", name or tag]
+    if notes:
+        args += ["--notes", notes]
+    if repo:
+        args += ["--repo", repo]
+    if target:
+        args += ["--target", target]
+    if draft:
+        args.append("--draft")
+    if prerelease:
+        args.append("--prerelease")
+    try:
+        url = _gh(*args).strip()
+        return f"Created release: {url}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_branch",
+    description="Delete a branch from the repository.",
+    parameters={
+        "branch": {
+            "type": "string",
+            "description": "Branch name to delete.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["branch"],
+)
+def delete_branch(branch: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["api", f"repos/{repo}/git/refs/heads/{branch}", "--method", "DELETE"]
+    try:
+        _gh(*args, timeout=15)
+        return f"Deleted branch '{branch}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_branches",
+    description="List branches in the repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_branches(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/branches?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No branches found."
+
+    lines = []
+    for b in data:
+        protection = "🔒" if b.get("protected") else "  "
+        lines.append(f"- {protection} `{b['name']}`")
+    return "\n".join(lines)
+
+
+@tool(
+    name="lock_issue",
+    description="Lock conversation on an issue or pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "reason": {
+            "type": "string",
+            "enum": ["off_topic", "too_heated", "resolved", "spam"],
+            "description": "Reason for locking.",
+        },
+    },
+    required=["number"],
+)
+def lock_issue(number: int, repo: str = "", reason: str = "resolved") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/lock", "--method", "PUT",
+            "--raw-field", f"lock_reason={reason}", timeout=15)
+        return f"Locked #{number} (reason: {reason})"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unlock_issue",
+    description="Unlock conversation on an issue or pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def unlock_issue(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/lock", "--method", "DELETE", timeout=15)
+        return f"Unlocked #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"

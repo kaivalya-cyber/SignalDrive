@@ -64,11 +64,13 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 
 | Category     | Tools |
 |-------------|-------|
-| Issues      | `list_issues`, `view_issue`, `create_issue`, `close_issue`, `reopen_issue`, `comment_on_issue`, `edit_issue`, `search_issues`, `add_issue_assignees` |
+| Issues      | `list_issues`, `view_issue`, `create_issue`, `close_issue`, `reopen_issue`, `comment_on_issue`, `edit_issue`, `search_issues`, `add_issue_assignees`, `lock_issue`, `unlock_issue` |
 | Pull Requests | `list_pull_requests`, `view_pull_request`, `create_pull_request`, `merge_pull_request`, `add_pr_review` |
 | Labels      | `list_labels`, `create_label` |
 | Milestones  | `list_milestones` |
-| Repository  | `get_repo_info` |
+| Releases    | `list_releases`, `create_release` |
+| Workflows   | `list_workflow_runs` |
+| Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami` |
 
 ## Architecture
 
