@@ -132,6 +132,40 @@ Check API rate limit.
 ### `gh api repos/<owner>/<repo>/issues/<number>/transfer --method POST --raw-field '{"new_owner":"...","new_name":"..."}'`
 Transfer an issue to another repository.
 
+## PR check / reviewer commands
+
+### `gh api repos/<owner>/<repo>/commits/<branch>/check-runs?per_page=20`
+List check run / CI status for a PR.
+
+### `gh pr review <number> --request --reviewer <user> [--team <team>]`
+Request reviewers on a pull request.
+
+## Comment commands
+
+### `gh api repos/<owner>/<repo>/issues/comments/<id> --method PATCH --raw-field 'body=...'`
+Edit an existing comment.
+
+### `gh api repos/<owner>/<repo>/issues/comments/<id> --method DELETE`
+Delete a comment.
+
+## Search commands
+
+### `gh search repos <query> [--limit <N>] [--json name,owner,stargazerCount,language]`
+Search repositories.
+
+### `gh search code <query> [--repo <owner/repo>] [--limit <N>] [--json path,repository]`
+Search code.
+
+## Fork commands
+
+### `gh api repos/<owner>/<repo>/forks --method POST [--raw-field organization=...]`
+Fork a repository.
+
+## Milestone commands
+
+### `gh api repos/<owner>/<repo>/milestones --method POST --raw-field 'title=...' [--raw-field 'description=...'] [--raw-field 'due_on=...']`
+Create a milestone.
+
 ## Workflow
 
 1. Ask which repository if not obvious (default: current repo from git remote).

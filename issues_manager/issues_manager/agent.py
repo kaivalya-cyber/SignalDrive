@@ -58,6 +58,18 @@ Reactions:
 Contributors:
 - list_contributors: List top contributors by commit count
 
+Comments:
+- update_comment: Edit an existing comment by ID
+- delete_comment: Delete a comment by ID
+
+Search:
+- search_repos: Search repositories (language, stars, topic qualifiers)
+- search_code: Search code within a repo
+
+PR Checks & Reviewers:
+- list_pr_checks: List check run / CI status on a PR
+- request_pr_reviewers: Request review from users or teams
+
 Other:
 - add_issue_assignees: Add assignees to an issue
 - lock_issue: Lock conversation on issue/PR (off_topic, too_heated, resolved, spam)
