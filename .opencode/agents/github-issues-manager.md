@@ -161,10 +161,39 @@ Search code.
 ### `gh api repos/<owner>/<repo>/forks --method POST [--raw-field organization=...]`
 Fork a repository.
 
+## Star / unstar commands
+
+### `gh api user/starred/<owner>/<repo> --method PUT`
+Star a repository.
+
+### `gh api user/starred/<owner>/<repo> --method DELETE`
+Unstar a repository.
+
+## Gist commands
+
+### `gh gist list [--limit <N>] [--public]`
+List gists.
+
+### `gh gist create [--desc "<description>"] [--public] <file1> [<file2> ...]`
+Create a gist from files.
+
+## Repository commands
+
+### `gh repo create <name> [--public|--private] [--description <desc>] [--add-readme] [--license <template>] [--gitignore <template>]`
+Create a new repository.
+
 ## Milestone commands
 
 ### `gh api repos/<owner>/<repo>/milestones --method POST --raw-field 'title=...' [--raw-field 'description=...'] [--raw-field 'due_on=...']`
 Create a milestone.
+
+### `gh issue edit <number> --milestone <number> --repo <owner/repo>`
+Assign issue to a milestone.
+
+## Compare commands
+
+### `gh api repos/<owner>/<repo>/compare/<base>...<head>`
+Compare two branches, tags, or commits.
 
 ## Workflow
 

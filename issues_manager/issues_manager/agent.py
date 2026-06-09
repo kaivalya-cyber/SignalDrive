@@ -66,12 +66,27 @@ Search:
 - search_repos: Search repositories (language, stars, topic qualifiers)
 - search_code: Search code within a repo
 
+Gists:
+- list_gists: List gists for the authenticated user
+- create_gist: Create a gist with file content
+
+Repository Management:
+- create_repo: Create a new repository on GitHub
+- star_repo / unstar_repo: Star or unstar a repository
+- fork_repo: Fork a repository
+- compare_refs: Compare two branches/tags/commits
+
+Comments:
+- list_issue_comments: List all comments on an issue/PR with timestamps
+- get_comment: Get a specific comment by ID
+
 PR Checks & Reviewers:
 - list_pr_checks: List check run / CI status on a PR
 - request_pr_reviewers: Request review from users or teams
 
 Other:
 - add_issue_assignees: Add assignees to an issue
+- set_issue_milestone: Assign an issue/PR to a milestone
 - lock_issue: Lock conversation on issue/PR (off_topic, too_heated, resolved, spam)
 - unlock_issue: Unlock conversation
 - transfer_issue: Transfer an issue to another repo

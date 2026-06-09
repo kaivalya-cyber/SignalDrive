@@ -1635,3 +1635,325 @@ def fork_repo(repo: str = "", organization: str = "") -> str:
         return f"Forked {repo} → {full_name}"
     except RuntimeError as e:
         return f"Error: {e}"
+
+
+@tool(
+    name="star_repo",
+    description="Star a repository for the authenticated user.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format.",
+        },
+    },
+    required=["repo"],
+)
+def star_repo(repo: str) -> str:
+    try:
+        _gh("api", f"user/starred/{repo}", "--method", "PUT", "--silent", timeout=15)
+        return f"Starred {repo} ⭐"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unstar_repo",
+    description="Unstar a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format.",
+        },
+    },
+    required=["repo"],
+)
+def unstar_repo(repo: str) -> str:
+    try:
+        _gh("api", f"user/starred/{repo}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Unstarred {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_issue_comments",
+    description="List all comments on an issue or pull request with author and timestamp.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=["number"],
+)
+def list_issue_comments(number: int, repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/issues/{number}/comments?per_page={limit}&sort=created&direction=asc", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No comments on this issue."
+
+    lines = []
+    for c in data:
+        author = c.get("user", {}).get("login", "?")
+        created = c.get("created_at", "?")
+        body = (c.get("body", "") or "")[:120].replace("\n", " ")
+        lines.append(f"- **{author}** ({created}): {body}{'...' if len(c.get('body','') or '') > 120 else ''}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_comment",
+    description="Get a specific comment by its ID.",
+    parameters={
+        "comment_id": {
+            "type": "integer",
+            "description": "Comment ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["comment_id"],
+)
+def get_comment(comment_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        c = _gh_json("api", f"repos/{repo}/issues/comments/{comment_id}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    author = c.get("user", {}).get("login", "?")
+    created = c.get("created_at", "?")
+    updated = c.get("updated_at", "")
+    body = c.get("body", "_No content_")
+    return f"**Comment {comment_id}** by {author}\n**Created:** {created}\n**Updated:** {updated}\n\n{body}"
+
+
+@tool(
+    name="set_issue_milestone",
+    description="Assign an issue or PR to a milestone.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "milestone": {
+            "type": "string",
+            "description": "Milestone title or number (number is more reliable).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "milestone"],
+)
+def set_issue_milestone(number: int, milestone: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    # If milestone is a title, look up its number
+    milestone_num = milestone
+    if not milestone.isdigit():
+        try:
+            ms = _gh_json("api", f"repos/{repo}/milestones?state=all&per_page=100", timeout=15)
+            for m in ms:
+                if m["title"].lower() == milestone.lower():
+                    milestone_num = str(m["number"])
+                    break
+            else:
+                return f"Error: milestone '{milestone}' not found. Use list_milestones to see available ones."
+        except RuntimeError as e:
+            return f"Error: {e}"
+
+    try:
+        _gh("issue", "edit", str(number), "--milestone", milestone_num, "--repo", repo)
+        return f"Set milestone to '{milestone}' on #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_repo",
+    description="Create a new repository on GitHub.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Repository name.",
+        },
+        "description": {
+            "type": "string",
+            "description": "Repository description.",
+        },
+        "private": {
+            "type": "boolean",
+            "description": "Create as private repository.",
+        },
+        "init": {
+            "type": "boolean",
+            "description": "Initialize with README.",
+        },
+        "license": {
+            "type": "string",
+            "description": "License template (e.g. mit, apache-2.0, gpl-3.0).",
+        },
+        "gitignore": {
+            "type": "string",
+            "description": "Gitignore template (e.g. Python, Node, Rust).",
+        },
+    },
+    required=["name"],
+)
+def create_repo(name: str, description: str = "", private: bool = False, init: bool = False, license: str = "", gitignore: str = "") -> str:
+    args = ["repo", "create", name]
+    if private:
+        args.append("--private")
+    else:
+        args.append("--public")
+    if description:
+        args += ["--description", description]
+    if init:
+        args.append("--add-readme")
+    if license:
+        args += ["--license", license]
+    if gitignore:
+        args += ["--gitignore", gitignore]
+    try:
+        url = _gh(*args, timeout=30).strip()
+        return f"Created repository: {url}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_gist",
+    description="Create a new gist with the given files.",
+    parameters={
+        "description": {
+            "type": "string",
+            "description": "Gist description.",
+        },
+        "public": {
+            "type": "boolean",
+            "description": "Create as public gist.",
+        },
+        "files": {
+            "type": "string",
+            "description": "JSON string mapping filename to content, e.g. '{\"hello.py\": \"print(\\\"hi\\\")\"}'",
+        },
+    },
+    required=["files"],
+)
+def create_gist(description: str = "", public: bool = False, files: str = "{}") -> str:
+    import json as j
+    try:
+        file_data = j.loads(files)
+    except j.JSONDecodeError:
+        return "Error: files must be a valid JSON object mapping filenames to content"
+    args = ["gist", "create"]
+    if description:
+        args += ["--desc", description]
+    if public:
+        args.append("--public")
+    else:
+        args.append("--private")
+    try:
+        url = _gh(*args, *file_data.keys(), timeout=30).strip()
+        return f"Created gist: {url}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_gists",
+    description="List gists for the authenticated user.",
+    parameters={
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+        "public": {
+            "type": "boolean",
+            "description": "Only show public gists.",
+        },
+    },
+    required=[],
+)
+def list_gists(limit: int = 10, public: bool = False) -> str:
+    args = ["gist", "list", "--limit", str(limit)]
+    if public:
+        args.append("--public")
+    try:
+        data = _gh_json(*args, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No gists found."
+
+    lines = []
+    for g in data:
+        vis = "public" if g.get("isPublic") else "secret"
+        files = ", ".join(g.get("files", {}).keys()) if isinstance(g.get("files"), dict) else ", ".join(f.get("name","?") for f in (g.get("files") or []))
+        lines.append(f"- `{g.get('name', g.get('id','?'))}` [{vis}] — {files}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="compare_refs",
+    description="Compare two git references (branches, tags, commits) in a repository.",
+    parameters={
+        "base": {
+            "type": "string",
+            "description": "Base ref (e.g. main, v1.0).",
+        },
+        "head": {
+            "type": "string",
+            "description": "Head ref to compare against base.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["base", "head"],
+)
+def compare_refs(base: str, head: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/compare/{base}...{head}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    ahead = data.get("ahead_by", 0)
+    behind = data.get("behind_by", 0)
+    files = data.get("files", [])
+    total_changes = sum(f.get("changes", 0) for f in files)
+    additions = sum(f.get("additions", 0) for f in files)
+    deletions = sum(f.get("deletions", 0) for f in files)
+    commits = data.get("total_commits", 0)
+    status = data.get("status", "?")
+
+    lines = [
+        f"**{base}...{head}** — {status}",
+        f"**Commits:** {commits} | **Files:** {len(files)} | **Changes:** +{additions}/-{deletions} ({total_changes} total)",
+        f"**Ahead by:** {ahead} | **Behind by:** {behind}",
+        "",
+    ]
+    for f in files[:30]:
+        status_icon = {"added": "+", "removed": "-", "modified": "~", "renamed": "→"}.get(f.get("status", ""), " ")
+        lines.append(f"  {status_icon} `{f['filename']}` (+{f.get('additions',0)}/-{f.get('deletions',0)})")
+    if len(files) > 30:
+        lines.append(f"  ... and {len(files) - 30} more files")
+    return "\n".join(lines)

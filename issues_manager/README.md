@@ -72,10 +72,11 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Workflows   | `list_workflow_runs` |
 | Notifications | `list_notifications`, `mark_notifications_read` |
 | PR Checks   | `list_pr_checks`, `request_pr_reviewers` |
-| Comments    | `update_comment`, `delete_comment` |
+| Comments    | `list_issue_comments`, `get_comment`, `update_comment`, `delete_comment` |
 | Search      | `search_repos`, `search_code` |
-| Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami`, `list_contributors`, `rate_limit`, `fork_repo` |
-| Milestones  | `list_milestones`, `create_milestone` |
+| Gists       | `list_gists`, `create_gist` |
+| Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami`, `list_contributors`, `rate_limit`, `fork_repo`, `star_repo`, `unstar_repo`, `create_repo`, `compare_refs` |
+| Milestones  | `list_milestones`, `create_milestone`, `set_issue_milestone` |
 | Reactions   | `add_reaction` |
 | Other       | `transfer_issue` |
 
