@@ -48,10 +48,22 @@ Repository:
 - delete_branch: Delete a branch after merge
 - whoami: Show the authenticated GitHub user
 
+Notifications:
+- list_notifications: List unread notifications (all/participating filters)
+- mark_notifications_read: Mark all or specific thread as read
+
+Reactions:
+- add_reaction: React to issues/comments (👍👎😄😕❤️🎉🚀👀)
+
+Contributors:
+- list_contributors: List top contributors by commit count
+
 Other:
 - add_issue_assignees: Add assignees to an issue
-- lock_issue: Lock conversation on an issue/PR (off_topic, too_heated, resolved, spam)
-- unlock_issue: Unlock conversation on an issue/PR
+- lock_issue: Lock conversation on issue/PR (off_topic, too_heated, resolved, spam)
+- unlock_issue: Unlock conversation
+- transfer_issue: Transfer an issue to another repo
+- rate_limit: Check GitHub API rate limit status
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.

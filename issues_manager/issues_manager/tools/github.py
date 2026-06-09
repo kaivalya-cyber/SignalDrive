@@ -1155,3 +1155,203 @@ def unlock_issue(number: int, repo: str = "") -> str:
         return f"Unlocked #{number}"
     except RuntimeError as e:
         return f"Error: {e}"
+
+
+@tool(
+    name="add_reaction",
+    description="Add a reaction to an issue, PR, or comment. Uses the comment ID if specified, otherwise targets the issue/PR.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "content": {
+            "type": "string",
+            "enum": ["+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"],
+            "description": "Reaction type.",
+        },
+        "comment_id": {
+            "type": "integer",
+            "description": "Optional comment ID to react to (instead of the issue).",
+        },
+    },
+    required=["number", "content"],
+)
+def add_reaction(number: int, repo: str = "", content: str = "+1", comment_id: int = 0) -> str:
+    repo = repo or _get_repo()
+    endpoint = f"repos/{repo}/issues/comments/{comment_id}/reactions" if comment_id else f"repos/{repo}/issues/{number}/reactions"
+    emoji_map = {
+        "+1": "👍", "-1": "👎", "laugh": "😄", "confused": "😕",
+        "heart": "❤️", "hooray": "🎉", "rocket": "🚀", "eyes": "👀",
+    }
+    try:
+        _gh("api", endpoint, "--method", "POST",
+            "--raw-field", f'content="{content}"', timeout=15)
+        return f"Added {emoji_map.get(content, content)} reaction to #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_notifications",
+    description="List unread GitHub notifications for the authenticated user.",
+    parameters={
+        "all": {
+            "type": "boolean",
+            "description": "Include all notifications, not just unread.",
+        },
+        "participating": {
+            "type": "boolean",
+            "description": "Only show notifications where user is participating.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_notifications(all: bool = False, participating: bool = False, limit: int = 10) -> str:
+    args = ["api", f"notifications?per_page={limit}"]
+    if all:
+        args[0] += "&all=true"
+    if participating:
+        args[0] += "&participating=true"
+    try:
+        notifs = _gh_json(*args, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not notifs:
+        return "No notifications."
+
+    lines = []
+    for n in notifs[:limit]:
+        repo_name = n.get("repository", {}).get("full_name", "?")
+        subject = n.get("subject", {})
+        title = subject.get("title", "?")
+        ntype = subject.get("type", "?")
+        reason = n.get("reason", "?")
+        url = subject.get("url", "")
+        lines.append(f"- [{repo_name}] **{ntype}** — {title} ({reason})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="mark_notifications_read",
+    description="Mark all notifications as read, or mark a specific thread by ID.",
+    parameters={
+        "thread_id": {
+            "type": "string",
+            "description": "Specific notification thread ID to mark as read. Omit to mark all.",
+        },
+        "last_read_at": {
+            "type": "string",
+            "description": "ISO 8601 timestamp to mark everything before as read.",
+        },
+    },
+    required=[],
+)
+def mark_notifications_read(thread_id: str = "", last_read_at: str = "") -> str:
+    try:
+        if thread_id:
+            _gh("api", f"notifications/threads/{thread_id}/read", "--method", "PATCH", "--silent", timeout=15)
+            return f"Marked notification {thread_id} as read"
+        else:
+            args = ["api", "notifications", "--method", "PUT"]
+            if last_read_at:
+                args += ["--raw-field", f'last_read_at={last_read_at}']
+            _gh(*args, timeout=15)
+            return "Marked all notifications as read"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_contributors",
+    description="List contributors to a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_contributors(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/contributors?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No contributors found."
+
+    lines = []
+    for c in data:
+        lines.append(f"- **{c['login']}** — {c.get('contributions', 0)} commits")
+    return "\n".join(lines)
+
+
+@tool(
+    name="rate_limit",
+    description="Check GitHub API rate limit status for the authenticated user.",
+    parameters={},
+    required=[],
+)
+def rate_limit() -> str:
+    try:
+        data = _gh_json("api", "rate_limit", timeout=10)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    core = data.get("resources", {}).get("core", {})
+    search = data.get("resources", {}).get("search", {})
+    graphql = data.get("resources", {}).get("graphql", {})
+
+    lines = [
+        "## API Rate Limits",
+        f"**Core:** {core.get('remaining', '?')}/{core.get('limit', '?')} remaining (resets {core.get('reset', '?')})",
+        f"**Search:** {search.get('remaining', '?')}/{search.get('limit', '?')} remaining",
+        f"**GraphQL:** {graphql.get('remaining', '?')}/{graphql.get('limit', '?')} remaining",
+    ]
+    return "\n".join(lines)
+
+
+@tool(
+    name="transfer_issue",
+    description="Transfer an issue to another repository.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue number to transfer.",
+        },
+        "destination": {
+            "type": "string",
+            "description": "Destination repository in owner/repo format.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Current repository. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "destination"],
+)
+def transfer_issue(number: int, destination: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/transfer", "--method", "POST",
+            "--raw-field", f'{{"new_owner":"{destination.split("/")[0]}","new_name":"{destination.split("/")[1]}"}}',
+            timeout=15)
+        return f"Transferred #{number} to {destination}"
+    except RuntimeError as e:
+        return f"Error: {e}"

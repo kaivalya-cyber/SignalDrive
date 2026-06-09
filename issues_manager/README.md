@@ -70,7 +70,10 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Milestones  | `list_milestones` |
 | Releases    | `list_releases`, `create_release` |
 | Workflows   | `list_workflow_runs` |
-| Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami` |
+| Notifications | `list_notifications`, `mark_notifications_read` |
+| Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami`, `list_contributors`, `rate_limit` |
+| Reactions   | `add_reaction` |
+| Other       | `transfer_issue` |
 
 ## Architecture
 

@@ -106,6 +106,32 @@ Unlock issue/PR conversation.
 ### `gh api user`
 Show authenticated GitHub user info.
 
+## Notification commands
+
+### `gh api notifications?per_page=<N>`
+List unread notifications.
+
+### `gh api notifications --method PUT`
+Mark all notifications as read.
+
+## Reaction commands
+
+### `gh api repos/<owner>/<repo>/issues/<number>/reactions --method POST --raw-field 'content="+1"'`
+Add reaction to issue/PR. Types: +1, -1, laugh, confused, heart, hooray, rocket, eyes.
+
+## Contributor commands
+
+### `gh api repos/<owner>/<repo>/contributors?per_page=<N>`
+List repository contributors.
+
+## Other commands
+
+### `gh api rate_limit`
+Check API rate limit.
+
+### `gh api repos/<owner>/<repo>/issues/<number>/transfer --method POST --raw-field '{"new_owner":"...","new_name":"..."}'`
+Transfer an issue to another repository.
+
 ## Workflow
 
 1. Ask which repository if not obvious (default: current repo from git remote).
