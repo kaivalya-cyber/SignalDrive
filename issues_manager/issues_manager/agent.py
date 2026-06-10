@@ -40,7 +40,9 @@ Releases:
 - create_release: Create a new release with tag, notes, draft, prerelease
 
 Workflows:
+- list_workflows: List workflow files in a repo
 - list_workflow_runs: List GitHub Actions runs with status/conclusion
+- trigger_workflow: Dispatch a workflow with optional inputs
 
 Repository:
 - get_repo_info: Repo stats (stars, forks, languages, topics, issues, PRs)
@@ -65,6 +67,7 @@ Comments:
 Search:
 - search_repos: Search repositories (language, stars, topic qualifiers)
 - search_code: Search code within a repo
+- search_users: Search GitHub users
 
 Gists:
 - list_gists: List gists for the authenticated user
@@ -87,6 +90,12 @@ PR Checks & Reviewers:
 Other:
 - add_issue_assignees: Add assignees to an issue
 - set_issue_milestone: Assign an issue/PR to a milestone
+- set_issue_priority: Set priority label (critical/high/medium/low)
+- remove_issue_labels: Remove specific labels from an issue/PR
+- update_pr_branch: Update PR branch with latest base
+- list_repo_topics / add_repo_topic: Manage repository topics
+- list_dependabot_alerts: List Dependabot security alerts
+- list_deployments: List deployments with environment info
 - lock_issue: Lock conversation on issue/PR (off_topic, too_heated, resolved, spam)
 - unlock_issue: Unlock conversation
 - transfer_issue: Transfer an issue to another repo

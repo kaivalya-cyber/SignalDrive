@@ -1957,3 +1957,360 @@ def compare_refs(base: str, head: str, repo: str = "") -> str:
     if len(files) > 30:
         lines.append(f"  ... and {len(files) - 30} more files")
     return "\n".join(lines)
+
+
+@tool(
+    name="trigger_workflow",
+    description="Trigger (dispatch) a GitHub Actions workflow by filename. Optionally pass inputs and target branch.",
+    parameters={
+        "workflow": {
+            "type": "string",
+            "description": "Workflow filename (e.g. 'ci.yml') or ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "ref": {
+            "type": "string",
+            "description": "Branch to run the workflow on (defaults to default branch).",
+        },
+        "inputs": {
+            "type": "string",
+            "description": "JSON string of workflow inputs, e.g. '{\"name\":\"value\"}'",
+        },
+    },
+    required=["workflow"],
+)
+def trigger_workflow(workflow: str, repo: str = "", ref: str = "", inputs: str = "{}") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    try:
+        input_data = j.loads(inputs) if inputs and inputs != "{}" else None
+    except j.JSONDecodeError:
+        return "Error: inputs must be valid JSON"
+    # Resolve workflow filename to ID if needed
+    wf_id = workflow
+    if not workflow.isdigit():
+        try:
+            wfs = _gh_json("api", f"repos/{repo}/actions/workflows?per_page=100", timeout=15)
+            for w in wfs.get("workflows", []):
+                if w["name"] == workflow or w["path"].endswith("/" + workflow):
+                    wf_id = str(w["id"])
+                    break
+            else:
+                return f"Error: workflow '{workflow}' not found. Use list_workflows to see available ones."
+        except RuntimeError as e:
+            return f"Error: {e}"
+    args = ["api", f"repos/{repo}/actions/workflows/{wf_id}/dispatches", "--method", "POST",
+            "--raw-field", f'ref={ref or "main"}']
+    if input_data:
+        args[-1] += f',"inputs":{j.dumps(input_data)}'
+    try:
+        _gh(*args, timeout=15)
+        return f"Triggered workflow '{workflow}' on {ref or 'default branch'}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_workflows",
+    description="List all GitHub Actions workflow files in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_workflows(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/workflows?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    workflows = data.get("workflows", [])
+    if not workflows:
+        return "No workflows found."
+
+    lines = []
+    for w in workflows:
+        state = w.get("state", "?")
+        badge = "✓" if state == "active" else ("✗" if state == "disabled" else "•")
+        lines.append(f"- {badge} **{w['name']}** — `{w['path']}` [{state}]")
+    return "\n".join(lines)
+
+
+@tool(
+    name="update_pr_branch",
+    description="Update a pull request branch with the latest changes from the base branch.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def update_pr_branch(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/pulls/{number}/update-branch", "--method", "PUT", "--silent", timeout=30)
+        return f"Updated PR #{number} branch with latest base"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="search_users",
+    description="Search GitHub users by query.",
+    parameters={
+        "query": {
+            "type": "string",
+            "description": "Search query (supports qualifiers like type:org, repos:>10, followers:>100).",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["query"],
+)
+def search_users(query: str, limit: int = 10) -> str:
+    try:
+        data = _gh_json("search", "users", query, "--limit", str(limit),
+                        "--json", "login,name,url", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No users found."
+
+    lines = []
+    for u in data:
+        name = u.get("name", "") or ""
+        name_str = f" ({name})" if name else ""
+        lines.append(f"- **{u['login']}**{name_str}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="remove_issue_labels",
+    description="Remove specific labels from an issue or pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "labels": {
+            "type": "string",
+            "description": "Comma-separated label names to remove.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "labels"],
+)
+def remove_issue_labels(number: int, labels: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["issue", "edit", str(number), "--repo", repo]
+    for l in labels.split(","):
+        l = l.strip()
+        if l:
+            args += ["--remove-label", l]
+    try:
+        _gh(*args)
+        return f"Removed labels from #{number}: {labels}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_repo_topics",
+    description="List all topics on a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_repo_topics(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/topics", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    topics = data.get("names", [])
+    if not topics:
+        return "No topics."
+    return "Topics: " + ", ".join(f"`{t}`" for t in topics)
+
+
+@tool(
+    name="add_repo_topic",
+    description="Add topics to a repository (replaces all existing topics — include all current ones to preserve them).",
+    parameters={
+        "topics": {
+            "type": "string",
+            "description": "Comma-separated topic names.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["topics"],
+)
+def add_repo_topic(topics: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    topic_list = [t.strip() for t in topics.split(",") if t.strip()]
+    try:
+        _gh("api", f"repos/{repo}/topics", "--method", "PUT",
+            "--raw-field", f'names={j.dumps(topic_list)}', timeout=15)
+        return f"Set topics: {', '.join(topic_list)}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_dependabot_alerts",
+    description="List Dependabot security alerts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "dismissed", "fixed"],
+            "description": "Filter by alert state.",
+        },
+        "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Filter by severity.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_dependabot_alerts(repo: str = "", state: str = "", severity: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    query = f"state={state}&" if state else ""
+    if severity:
+        query += f"severity={severity}&"
+    query += f"per_page={limit}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/dependabot/alerts?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No Dependabot alerts found."
+
+    lines = []
+    for a in data:
+        pkg = a.get("security_advisory", {}).get("package", {}).get("name", "?") if a.get("security_advisory") else (a.get("security_vulnerability", {}).get("package", {}).get("name", "?") if a.get("security_vulnerability") else "?")
+        sev = a.get("security_advisory", {}).get("severity", "?") if a.get("security_advisory") else "?"
+        state_str = a.get("state", "?")
+        lines.append(f"- **{pkg}** [{sev}] ({state_str}) — {a.get('html_url', '')}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="set_issue_priority",
+    description="Set priority on an issue by adding a priority label. Creates the label if it doesn't exist.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "priority": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Priority level.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "priority"],
+)
+def set_issue_priority(number: int, priority: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    label_name = f"priority:{priority}"
+    color_map = {"critical": "b60205", "high": "d93f0b", "medium": "fbca04", "low": "0e8a16"}
+    # Try to create label if it doesn't exist (silently ignore if already exists)
+    try:
+        _gh("label", "create", label_name, "--color", color_map.get(priority, "cccccc"),
+            "--repo", repo, "--silent")
+    except RuntimeError:
+        pass
+    try:
+        _gh("issue", "edit", str(number), "--add-label", label_name, "--repo", repo)
+        return f"Set priority:{priority} on #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_deployments",
+    description="List deployments for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "environment": {
+            "type": "string",
+            "description": "Filter by environment name (e.g. production, staging).",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_deployments(repo: str = "", environment: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    query = f"per_page={limit}"
+    if environment:
+        query += f"&environment={environment}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/deployments?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No deployments found."
+
+    lines = []
+    for d in data:
+        env = d.get("environment", "?")
+        creator = d.get("creator", {}).get("login", "?")
+        created = d.get("created_at", "?")
+        ref = d.get("ref", "?")
+        status = "active" if d.get("statuses_url") else "?"
+        lines.append(f"- `{ref}` → **{env}** by {creator} ({created}) [{status}]")
+    return "\n".join(lines)

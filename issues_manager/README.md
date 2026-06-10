@@ -69,16 +69,19 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Labels      | `list_labels`, `create_label` |
 | Milestones  | `list_milestones` |
 | Releases    | `list_releases`, `create_release` |
-| Workflows   | `list_workflow_runs` |
+| Workflows   | `list_workflows`, `list_workflow_runs`, `trigger_workflow` |
 | Notifications | `list_notifications`, `mark_notifications_read` |
 | PR Checks   | `list_pr_checks`, `request_pr_reviewers` |
 | Comments    | `list_issue_comments`, `get_comment`, `update_comment`, `delete_comment` |
-| Search      | `search_repos`, `search_code` |
+| Search      | `search_repos`, `search_code`, `search_users` |
 | Gists       | `list_gists`, `create_gist` |
 | Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami`, `list_contributors`, `rate_limit`, `fork_repo`, `star_repo`, `unstar_repo`, `create_repo`, `compare_refs` |
 | Milestones  | `list_milestones`, `create_milestone`, `set_issue_milestone` |
+| Security    | `list_dependabot_alerts` |
+| Deployments | `list_deployments` |
+| Topics      | `list_repo_topics`, `add_repo_topic` |
 | Reactions   | `add_reaction` |
-| Other       | `transfer_issue` |
+| Other       | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `update_pr_branch` |
 
 ## Architecture
 

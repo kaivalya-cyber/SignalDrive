@@ -195,6 +195,47 @@ Assign issue to a milestone.
 ### `gh api repos/<owner>/<repo>/compare/<base>...<head>`
 Compare two branches, tags, or commits.
 
+## Workflow dispatch commands
+
+### `gh api repos/<owner>/<repo>/actions/workflows`
+List all workflow files.
+
+### `gh workflow run <workflow> [--ref <branch>] [--raw-field inputs]`
+Trigger a workflow dispatch.
+
+## User search commands
+
+### `gh search users <query> [--limit <N>] [--json login,name]`
+Search GitHub users.
+
+## Security commands
+
+### `gh api repos/<owner>/<repo>/dependabot/alerts?state=<state>&severity=<severity>`
+List Dependabot security alerts.
+
+## Topic commands
+
+### `gh api repos/<owner>/<repo>/topics`
+List repository topics.
+
+### `gh api repos/<owner>/<repo>/topics --method PUT --raw-field 'names=["topic1","topic2"]'`
+Set repository topics.
+
+## Deployment commands
+
+### `gh api repos/<owner>/<repo>/deployments?per_page=<N>&environment=<name>`
+List deployments.
+
+## Priority commands
+
+### `gh issue edit <number> --add-label priority:<level> --repo <owner/repo>`
+Set priority on an issue. Levels: critical, high, medium, low.
+
+## Branch update commands
+
+### `gh api repos/<owner>/<repo>/pulls/<number>/update-branch --method PUT`
+Update a PR branch with latest base.
+
 ## Workflow
 
 1. Ask which repository if not obvious (default: current repo from git remote).
