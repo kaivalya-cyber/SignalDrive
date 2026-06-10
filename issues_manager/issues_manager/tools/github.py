@@ -3060,3 +3060,388 @@ def remove_collaborator(username: str, repo: str = "") -> str:
         return f"Removed {username} from {repo}"
     except RuntimeError as e:
         return f"Error: {e}"
+
+
+@tool(
+    name="list_code_scanning_alerts",
+    description="List Code Scanning security alerts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "dismissed", "fixed"],
+            "description": "Filter by state.",
+        },
+        "severity": {
+            "type": "string",
+            "enum": ["error", "warning", "note"],
+            "description": "Filter by severity.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_code_scanning_alerts(repo: str = "", state: str = "", severity: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    query = f"per_page={limit}"
+    if state:
+        query += f"&state={state}"
+    if severity:
+        query += f"&severity={severity}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/code-scanning/alerts?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No code scanning alerts found."
+
+    lines = []
+    for a in data:
+        rule = a.get("rule", {}).get("name", a.get("rule", {}).get("id", "?"))
+        sev = a.get("rule", {}).get("security_severity_level", a.get("rule", {}).get("severity", "?"))
+        state_str = a.get("state", "?")
+        lines.append(f"- **{rule}** [{sev}] ({state_str}) — {a.get('html_url', '')}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_secret_scanning_alerts",
+    description="List Secret Scanning alerts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "resolved"],
+            "description": "Filter by state.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_secret_scanning_alerts(repo: str = "", state: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    query = f"per_page={limit}"
+    if state:
+        query += f"&state={state}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/secret-scanning/alerts?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No secret scanning alerts found."
+
+    lines = []
+    for a in data:
+        secret_type = a.get("secret_type_display_name", a.get("secret_type", "?"))
+        state_str = a.get("state", "?")
+        created = a.get("created_at", "?")
+        lines.append(f"- **{secret_type}** [{state_str}] — detected {created}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_webhooks",
+    description="List webhooks configured on a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_webhooks(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/hooks?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No webhooks found."
+
+    lines = []
+    for h in data:
+        url = h.get("config", {}).get("url", "?")
+        events = ", ".join(h.get("events", []))
+        active = "✓" if h.get("active") else "✗"
+        lines.append(f"- {active} **{h['name']}** → `{url}` [{events}]")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_branch_protection",
+    description="Get branch protection rules for a branch.",
+    parameters={
+        "branch": {
+            "type": "string",
+            "description": "Branch name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["branch"],
+)
+def get_branch_protection(branch: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/branches/{branch}/protection", timeout=15)
+    except RuntimeError:
+        return "No branch protection rules found (or branch doesn't exist)."
+
+    lines = [f"## Branch protection: `{branch}`"]
+    checks = []
+
+    if data.get("required_status_checks"):
+        contexts = data["required_status_checks"].get("contexts", [])
+        strict = data["required_status_checks"].get("strict", False)
+        checks.append(f"- ✅ Required status checks: {', '.join(contexts) or 'none'} (strict: {strict})")
+    else:
+        checks.append("- ❌ No required status checks")
+
+    if data.get("required_pull_request_reviews"):
+        reviews = data["required_pull_request_reviews"]
+        approvals = reviews.get("required_approving_review_count", 0)
+        dismiss = "requires dismissal" if reviews.get("dismiss_stale_reviews") else ""
+        checks.append(f"- ✅ Required reviews: {approvals} approval(s) {dismiss}")
+    else:
+        checks.append("- ❌ No required reviews")
+
+    if data.get("enforce_admins", {}).get("enabled"):
+        checks.append("- ✅ Admin enforcement enabled")
+    else:
+        checks.append("- ❌ No admin enforcement")
+
+    if data.get("restrictions"):
+        users = data["restrictions"].get("users", [])
+        teams = data["restrictions"].get("teams", [])
+        users_str = ", ".join(u["login"] for u in users) if users else "none"
+        teams_str = ", ".join(t["slug"] for t in teams) if teams else "none"
+        checks.append(f"- 🔒 Push restrictions: users={users_str}, teams={teams_str}")
+    else:
+        checks.append("- ❌ No push restrictions")
+
+    if data.get("required_linear_history", {}).get("enabled"):
+        checks.append("- ✅ Linear history required")
+    if data.get("allow_force_pushes", {}).get("enabled"):
+        checks.append("- ⚠️ Force pushes allowed")
+    if data.get("allow_deletions", {}).get("enabled"):
+        checks.append("- ⚠️ Deletions allowed")
+
+    lines.extend(checks)
+    return "\n".join(lines)
+
+
+@tool(
+    name="repo_traffic",
+    description="Get repository traffic data (clones and views for the last 14 days).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def repo_traffic(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    lines = []
+    try:
+        views = _gh_json("api", f"repos/{repo}/traffic/views", timeout=15)
+        view_count = views.get("count", 0)
+        view_unique = views.get("uniques", 0)
+        lines.append(f"**Views (14 days):** {view_count} total, {view_unique} unique")
+    except RuntimeError:
+        lines.append("**Views:** N/A")
+
+    try:
+        clones = _gh_json("api", f"repos/{repo}/traffic/clones", timeout=15)
+        clone_count = clones.get("count", 0)
+        clone_unique = clones.get("uniques", 0)
+        lines.append(f"**Clones (14 days):** {clone_count} total, {clone_unique} unique")
+    except RuntimeError:
+        lines.append("**Clones:** N/A")
+
+    try:
+        referrers = _gh_json("api", f"repos/{repo}/traffic/popular/referrers", timeout=15)
+        if referrers:
+            top = referrers[0] if referrers else {}
+            lines.append(f"**Top referrer:** {top.get('referrer', '?')} ({top.get('count', 0)} views)")
+    except RuntimeError:
+        pass
+
+    try:
+        paths = _gh_json("api", f"repos/{repo}/traffic/popular/paths", timeout=15)
+        if paths:
+            top = paths[0] if paths else {}
+            lines.append(f"**Top path:** `{top.get('path', '?')}` ({top.get('count', 0)} views)")
+    except RuntimeError:
+        pass
+
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_licenses",
+    description="List all available open source license templates.",
+    parameters={},
+    required=[],
+)
+def list_licenses() -> str:
+    try:
+        data = _gh_json("api", "licenses", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No licenses found."
+
+    lines = []
+    for l in data:
+        desc = l.get("description", "")[:100]
+        featured = " ★" if l.get("featured") else ""
+        lines.append(f"- `{l['key']}`{featured} — **{l['name']}**")
+    return "\n".join(lines)
+
+
+@tool(
+    name="render_markdown",
+    description="Render GitHub Flavored Markdown text to HTML.",
+    parameters={
+        "text": {
+            "type": "string",
+            "description": "Markdown text to render.",
+        },
+        "mode": {
+            "type": "string",
+            "enum": ["markdown", "gfm"],
+            "description": "Render mode: markdown or gfm (GitHub Flavored Markdown). Default: gfm.",
+        },
+        "context": {
+            "type": "string",
+            "description": "Repository context for GFM (owner/repo) to resolve issues/mentions.",
+        },
+    },
+    required=["text"],
+)
+def render_markdown(text: str, mode: str = "gfm", context: str = "") -> str:
+    import json as j
+    payload = {"text": text, "mode": mode}
+    if context:
+        payload["context"] = context
+    try:
+        result = _gh("api", "markdown", "--method", "POST",
+                      "--raw-field", j.dumps(payload), "--jq", ".", timeout=15)
+        return result
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="watch_repo",
+    description="Subscribe to notifications for a repository (watch).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format.",
+        },
+    },
+    required=["repo"],
+)
+def watch_repo(repo: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/subscription", "--method", "PUT",
+            "--raw-field", '{"subscribed":true}', "--silent", timeout=15)
+        return f"Watching {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unwatch_repo",
+    description="Unsubscribe from notifications for a repository (unwatch).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format.",
+        },
+    },
+    required=["repo"],
+)
+def unwatch_repo(repo: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/subscription", "--method", "DELETE", "--silent", timeout=15)
+        return f"Unwatched {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="community_profile",
+    description="Get the community health / profile metrics for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def community_profile(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/community/profile", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    health = data.get("health_percentage", 0)
+    files = data.get("files", {})
+
+    lines = [
+        f"## Community Profile: {repo}",
+        f"**Health:** {health}%",
+        "",
+        "### Files",
+    ]
+
+    file_status = {
+        "code_of_conduct": "CODE_OF_CONDUCT",
+        "contributing": "CONTRIBUTING",
+        "issue_template": "Issue template",
+        "pull_request_template": "PR template",
+        "license": "License",
+        "readme": "README",
+        "funding": "FUNDING",
+    }
+
+    for key, label in file_status.items():
+        f = files.get(key, {})
+        if f:
+            lines.append(f"- ✅ **{label}** — {f.get('url', 'present')}")
+        else:
+            lines.append(f"- ❌ **{label}** — missing")
+
+    desc = data.get("description", "")
+    if desc:
+        lines.append(f"\n**Description:** {desc}")
+    return "\n".join(lines)

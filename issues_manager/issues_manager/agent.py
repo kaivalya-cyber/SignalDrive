@@ -117,6 +117,15 @@ Other:
 - list_issue_events: Get timeline events (labeled, assigned, referenced, etc.)
 - transfer_repo: Transfer repo to another user/org
 - remove_collaborator: Remove a collaborator from repo
+- list_code_scanning_alerts: Code scanning security alerts
+- list_secret_scanning_alerts: Secret scanning alerts
+- list_webhooks: List repo webhooks
+- get_branch_protection: Branch protection rules overview
+- repo_traffic: Clone/view traffic for last 14 days
+- list_licenses: List all open source license templates
+- render_markdown: Render markdown to HTML (gfm mode)
+- watch_repo / unwatch_repo: Subscribe/unsubscribe to repo notifications
+- community_profile: Community health metrics and file status
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.

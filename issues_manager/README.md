@@ -77,7 +77,7 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Gists       | `list_gists`, `create_gist` |
 | Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami`, `list_contributors`, `rate_limit`, `fork_repo`, `star_repo`, `unstar_repo`, `create_repo`, `compare_refs` |
 | Milestones  | `list_milestones`, `create_milestone`, `set_issue_milestone` |
-| Security      | `list_dependabot_alerts` |
+| Security      | `list_dependabot_alerts`, `list_code_scanning_alerts`, `list_secret_scanning_alerts` |
 | Deployments   | `list_deployments` |
 | Topics        | `list_repo_topics`, `add_repo_topic` |
 | Labels        | `list_labels`, `create_label`, `update_label`, `delete_label` |
@@ -93,6 +93,13 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Issue Events    | `list_issue_events` |
 | Environments    | `list_environments` |
 | Repo Transfer   | `transfer_repo` |
+| Webhooks        | `list_webhooks` |
+| Traffic         | `repo_traffic` |
+| Markdown        | `render_markdown` |
+| Watch/Unwatch   | `watch_repo`, `unwatch_repo` |
+| Community       | `community_profile` |
+| Branch Protect  | `get_branch_protection` |
+| Licenses        | `list_licenses` |
 | Other           | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `update_pr_branch`, `remove_collaborator` |
 
 ## Architecture
