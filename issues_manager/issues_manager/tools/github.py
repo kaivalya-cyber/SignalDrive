@@ -3804,6 +3804,1212 @@ def create_repo_from_template(template_repo: str, name: str, owner: str = "", de
 
 
 @tool(
+    name="get_workflow_run",
+    description="Get detailed information about a specific workflow run.",
+    parameters={
+        "run_id": {
+            "type": "integer",
+            "description": "Workflow run ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["run_id"],
+)
+def get_workflow_run(run_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/runs/{run_id}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    lines = [
+        f"**Run:** {data.get('name', '?')} (#{data.get('run_number', '?')})",
+        f"**Status:** {data.get('status', '?')} — {data.get('conclusion', '?')}",
+        f"**Branch:** {data.get('head_branch', '?')}",
+        f"**Trigger:** {data.get('event', '?')}",
+        f"**Commit:** {data.get('head_sha', '?')[:7]}",
+        f"**Created:** {data.get('created_at', '?')}",
+        f"**Duration:** {data.get('run_started_at', '?')} → {data.get('updated_at', '?')}",
+        f"**URL:** {data.get('html_url', '?')}",
+    ]
+    return "\n".join(lines)
+
+
+@tool(
+    name="delete_workflow_run",
+    description="Delete a specific workflow run. Logs and artifacts are also deleted.",
+    parameters={
+        "run_id": {
+            "type": "integer",
+            "description": "Workflow run ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["run_id"],
+)
+def delete_workflow_run(run_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/actions/runs/{run_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Deleted workflow run #{run_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_artifact",
+    description="Delete a specific workflow artifact.",
+    parameters={
+        "artifact_id": {
+            "type": "integer",
+            "description": "Artifact ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["artifact_id"],
+)
+def delete_artifact(artifact_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/actions/artifacts/{artifact_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Deleted artifact #{artifact_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_repo_secret",
+    description="Create or update an Actions secret in a repository.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Secret name (uppercase, underscores).",
+        },
+        "value": {
+            "type": "string",
+            "description": "Secret value.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name", "value"],
+)
+def set_repo_secret(name: str, value: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("secret", "set", name, "--repo", repo, "--body", value, timeout=15)
+        return f"Secret '{name}' set on {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_repo_secret",
+    description="Delete an Actions secret from a repository.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Secret name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name"],
+)
+def delete_repo_secret(name: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/actions/secrets/{name}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Secret '{name}' deleted from {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_repo_variable",
+    description="Create or update an Actions variable in a repository.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Variable name.",
+        },
+        "value": {
+            "type": "string",
+            "description": "Variable value.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name", "value"],
+)
+def set_repo_variable(name: str, value: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("variable", "set", name, "--repo", repo, "--body", value, timeout=15)
+        return f"Variable '{name}' set on {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_repo_variable",
+    description="Delete an Actions variable from a repository.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Variable name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name"],
+)
+def delete_repo_variable(name: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/actions/variables/{name}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Variable '{name}' deleted from {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_webhook",
+    description="Create a repository webhook.",
+    parameters={
+        "url": {
+            "type": "string",
+            "description": "Payload URL for the webhook.",
+        },
+        "events": {
+            "type": "string",
+            "description": "Comma-separated event names to trigger on (default: push).",
+        },
+        "secret": {
+            "type": "string",
+            "description": "Secret token for webhook verification.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "active": {
+            "type": "boolean",
+            "description": "Deliver payloads when events occur.",
+        },
+    },
+    required=["url"],
+)
+def create_webhook(url: str, events: str = "push", secret: str = "", repo: str = "", active: bool = True) -> str:
+    repo = repo or _get_repo()
+    import json as j
+    config = {"url": url, "content_type": "json"}
+    if secret:
+        config["secret"] = secret
+    event_list = [e.strip() for e in events.split(",") if e.strip()]
+    payload = j.dumps({"name": "web", "config": config, "events": event_list, "active": active})
+    try:
+        data = _gh_json("api", f"repos/{repo}/hooks", "--method", "POST",
+                        "--raw-field", payload, timeout=15)
+        hook_id = data.get("id", "?")
+        return f"Webhook #{hook_id} created on {repo} (events: {events})"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_webhook",
+    description="Delete a repository webhook.",
+    parameters={
+        "hook_id": {
+            "type": "integer",
+            "description": "Webhook ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["hook_id"],
+)
+def delete_webhook(hook_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/hooks/{hook_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Webhook #{hook_id} deleted from {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="ping_webhook",
+    description="Send a ping event to a repository webhook.",
+    parameters={
+        "hook_id": {
+            "type": "integer",
+            "description": "Webhook ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["hook_id"],
+)
+def ping_webhook(hook_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/hooks/{hook_id}/pings", "--method", "POST", "--silent", timeout=15)
+        return f"Ping sent to webhook #{hook_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_milestone",
+    description="Get a specific milestone.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Milestone number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def get_milestone(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/milestones/{number}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return (
+        f"**Milestone #{data.get('number')}:** {data.get('title', '?')}\n"
+        f"**State:** {data.get('state', '?')} — {data.get('open_issues', 0)} open / {data.get('closed_issues', 0)} closed\n"
+        f"**Due:** {data.get('due_on', 'none')}\n"
+        f"**Description:** {data.get('description', '')}"
+    )
+
+
+@tool(
+    name="update_milestone",
+    description="Update a milestone.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Milestone number.",
+        },
+        "title": {
+            "type": "string",
+            "description": "New title.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "closed"],
+            "description": "New state.",
+        },
+        "description": {
+            "type": "string",
+            "description": "New description.",
+        },
+        "due_on": {
+            "type": "string",
+            "description": "New due date (ISO 8601, e.g. 2026-07-01T00:00:00Z).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def update_milestone(number: int, title: str = "", state: str = "", description: str = "", due_on: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = {}
+    if title:
+        payload["title"] = title
+    if state:
+        payload["state"] = state
+    if description:
+        payload["description"] = description
+    if due_on:
+        payload["due_on"] = due_on
+    if not payload:
+        return "Nothing to update."
+    try:
+        _gh("api", f"repos/{repo}/milestones/{number}", "--method", "PATCH",
+            "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        return f"Milestone #{number} updated"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_milestone",
+    description="Delete a milestone.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Milestone number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def delete_milestone(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/milestones/{number}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Milestone #{number} deleted"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_deploy_key",
+    description="Delete a deploy key from a repository.",
+    parameters={
+        "key_id": {
+            "type": "integer",
+            "description": "Deploy key ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["key_id"],
+)
+def delete_deploy_key(key_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/keys/{key_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Deploy key #{key_id} deleted"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_branch",
+    description="Get a single branch with protection and commit info.",
+    parameters={
+        "branch": {
+            "type": "string",
+            "description": "Branch name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["branch"],
+)
+def get_branch(branch: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/branches/{branch}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    commit = data.get("commit", {})
+    protected = data.get("protected", False)
+    protection = data.get("protection", {})
+    lines = [
+        f"**Branch:** {data.get('name', '?')}",
+        f"**Protected:** {protected}",
+        f"**Latest commit:** {commit.get('sha', '?')[:7]} — {commit.get('commit', {}).get('message', '?').split(chr(10))[0]}",
+        f"**Author:** {commit.get('commit', {}).get('author', {}).get('name', '?')}",
+        f"**Date:** {commit.get('commit', {}).get('author', {}).get('date', '?')}",
+    ]
+    if protection:
+        urls = protection.get("url", "")
+        if urls:
+            lines.append(f"**Protection rules:** applied")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_environment",
+    description="Create or update a deployment environment.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Environment name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "wait_timer": {
+            "type": "integer",
+            "description": "Wait timer in minutes (for required reviewers).",
+        },
+        "prevent_self_review": {
+            "type": "boolean",
+            "description": "Prevent authors from approving their own deployments.",
+        },
+    },
+    required=["name"],
+)
+def create_environment(name: str, repo: str = "", wait_timer: int = 0, prevent_self_review: bool = False) -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {}
+    if wait_timer > 0 or prevent_self_review:
+        revision = {}
+        if wait_timer > 0:
+            revision["wait_timer"] = wait_timer * 60
+        if prevent_self_review:
+            revision["prevent_self_review"] = True
+        payload["deployment_branch_policy"] = {"protected_branches": False, "custom_branch_policies": False}
+    try:
+        _gh("api", f"repos/{repo}/environments/{name}", "--method", "PUT",
+            "--raw-field", j.dumps(payload) if payload else "{}", "--silent", timeout=15)
+        return f"Environment '{name}' created/updated on {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_environment",
+    description="Delete a deployment environment.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Environment name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name"],
+)
+def delete_environment(name: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/environments/{name}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Environment '{name}' deleted"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_deployment",
+    description="Create a deployment.",
+    parameters={
+        "ref": {
+            "type": "string",
+            "description": "Branch, tag, or SHA to deploy.",
+        },
+        "environment": {
+            "type": "string",
+            "description": "Environment name (production, staging, etc.).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "description": {
+            "type": "string",
+            "description": "Deployment description.",
+        },
+        "auto_merge": {
+            "type": "boolean",
+            "description": "Auto-merge the ref if behind the base.",
+        },
+    },
+    required=["ref", "environment"],
+)
+def create_deployment(ref: str, environment: str, repo: str = "", description: str = "", auto_merge: bool = True) -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = j.dumps({
+        "ref": ref,
+        "environment": environment,
+        "description": description,
+        "auto_merge": auto_merge,
+        "production_environment": environment == "production",
+    })
+    try:
+        data = _gh_json("api", f"repos/{repo}/deployments", "--method", "POST",
+                        "--raw-field", payload, timeout=15)
+        deploy_id = data.get("id", "?")
+        return f"Deployment #{deploy_id} created on {repo} ({environment})"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_deployment_statuses",
+    description="List statuses for a deployment.",
+    parameters={
+        "deployment_id": {
+            "type": "integer",
+            "description": "Deployment ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["deployment_id"],
+)
+def list_deployment_statuses(deployment_id: int, repo: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/deployments/{deployment_id}/statuses?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No deployment statuses found."
+    lines = []
+    for s in data:
+        state = s.get("state", "?")
+        creator = s.get("creator", {}).get("login", "?")
+        created = s.get("created_at", "?")
+        desc = s.get("description", "")
+        desc_str = f" — {desc}" if desc else ""
+        lines.append(f"- **{state}** by {creator}{desc_str} ({created})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_commit",
+    description="Get a single commit by SHA with details.",
+    parameters={
+        "sha": {
+            "type": "string",
+            "description": "Commit SHA.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["sha"],
+)
+def get_commit(sha: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/commits/{sha}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    commit = data.get("commit", {})
+    author = commit.get("author", {})
+    lines = [
+        f"**SHA:** {data.get('sha', '?')}",
+        f"**Author:** {author.get('name', '?')} <{author.get('email', '?')}>",
+        f"**Date:** {author.get('date', '?')}",
+        f"**Message:** {commit.get('message', '?').split(chr(10))[0]}",
+        f"**Files:** {len(data.get('files', []))} changed",
+    ]
+    stats = commit.get("stats", {})
+    if stats:
+        lines.append(f"**Stats:** +{stats.get('additions', 0)} / -{stats.get('deletions', 0)}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_repo_content",
+    description="Get the content of a file or directory from a repository.",
+    parameters={
+        "path": {
+            "type": "string",
+            "description": "File or directory path.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "ref": {
+            "type": "string",
+            "description": "Branch or tag name. Defaults to default branch.",
+        },
+    },
+    required=["path"],
+)
+def get_repo_content(path: str, repo: str = "", ref: str = "") -> str:
+    repo = repo or _get_repo()
+    url = f"repos/{repo}/contents/{path}"
+    if ref:
+        url += f"?ref={ref}"
+    try:
+        data = _gh_json("api", url, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if isinstance(data, list):
+        lines = [f"## Contents of `{path}`\n"]
+        for item in data:
+            icon = "📄" if item["type"] == "file" else "📁"
+            lines.append(f"- {icon} `{item['name']}`")
+        return "\n".join(lines)
+
+    content_b64 = data.get("content", "")
+    if data.get("encoding") == "base64" and content_b64:
+        import base64
+        try:
+            decoded = base64.b64decode(content_b64).decode("utf-8")
+            size = data.get("size", 0)
+            if len(decoded) > 2000:
+                decoded = decoded[:2000] + f"\n\n... (truncated, {size} bytes total)"
+            if data.get("type") == "symlink":
+                return f"**Symlink:** {data.get('target', '?')}\n\nContent:\n{decoded}"
+            if data.get("type") == "submodule":
+                return f"**Submodule:** {data.get('submodule_git_url', '?')}"
+            return f"## `{path}`\n\n{decoded}"
+        except Exception:
+            pass
+    return f"{data.get('name', '?')} — {data.get('type', '?')} ({data.get('size', 0)} bytes)"
+
+
+@tool(
+    name="list_forks",
+    description="List forks of a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+        "sort": {
+            "type": "string",
+            "description": "Sort by: newest, oldest, stargazers, watchers.",
+        },
+    },
+    required=[],
+)
+def list_forks(repo: str = "", limit: int = 10, sort: str = "newest") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/forks?per_page={limit}&sort={sort}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No forks found."
+    lines = []
+    for f in data:
+        full_name = f.get("full_name", "?")
+        stars = f.get("stargazers_count", 0)
+        forks = f.get("forks_count", 0)
+        owner = f.get("owner", {}).get("login", "?")
+        lines.append(f"- **{full_name}** (⭐{stars}, 🍴{forks}) by {owner}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_commit_statuses",
+    description="List commit statuses for a given reference.",
+    parameters={
+        "ref": {
+            "type": "string",
+            "description": "Branch, tag, or SHA.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=["ref"],
+)
+def list_commit_statuses(ref: str, repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/commits/{ref}/statuses?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No statuses found."
+    lines = []
+    for s in data:
+        state = s.get("state", "?")
+        context = s.get("context", "?")
+        desc = s.get("description", "")
+        target = s.get("target_url", "")
+        desc_str = f" — {desc}" if desc else ""
+        lines.append(f"- **{context}**: {state}{desc_str}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_combined_commit_status",
+    description="Get the combined commit status for a given reference.",
+    parameters={
+        "ref": {
+            "type": "string",
+            "description": "Branch, tag, or SHA.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["ref"],
+)
+def get_combined_commit_status(ref: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/commits/{ref}/status", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    state = data.get("state", "?")
+    statuses = data.get("statuses", [])
+    total = data.get("total_count", 0)
+    lines = [
+        f"**Combined state:** {state}",
+        f"**Total statuses:** {total}",
+        "",
+    ]
+    for s in statuses:
+        context = s.get("context", "?")
+        st = s.get("state", "?")
+        lines.append(f"- **{context}**: {st}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_git_ref",
+    description="Create a git reference (branch or tag).",
+    parameters={
+        "ref": {
+            "type": "string",
+            "description": "Full reference name (e.g. refs/heads/new-branch or refs/tags/v1.0).",
+        },
+        "sha": {
+            "type": "string",
+            "description": "SHA to point the reference to.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["ref", "sha"],
+)
+def create_git_ref(ref: str, sha: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = j.dumps({"ref": ref, "sha": sha})
+    try:
+        data = _gh_json("api", f"repos/{repo}/git/refs", "--method", "POST",
+                        "--raw-field", payload, timeout=15)
+        return f"Created ref: {data.get('ref', '?')} → {data.get('object', {}).get('sha', '?')[:7]}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_git_ref",
+    description="Delete a git reference (branch, tag, etc.).",
+    parameters={
+        "ref": {
+            "type": "string",
+            "description": "Full reference (e.g. refs/heads/branch-name).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["ref"],
+)
+def delete_git_ref(ref: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    # GitHub API expects ref without 'refs/' prefix
+    ref_path = ref[5:] if ref.startswith("refs/") else ref
+    try:
+        _gh("api", f"repos/{repo}/git/refs/{ref_path}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Ref '{ref}' deleted"
+    except RuntimeError as e:
+        return f"Error: {e}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_reactions",
+    description="List reactions for an issue, comment, or PR review comment.",
+    parameters={
+        "issue_number": {
+            "type": "integer",
+            "description": "Issue or PR number (mutually exclusive with comment_id).",
+        },
+        "comment_id": {
+            "type": "integer",
+            "description": "Comment ID (mutually exclusive with issue_number).",
+        },
+        "content": {
+            "type": "string",
+            "description": "Filter by reaction type (+1, -1, laugh, confused, heart, hooray, rocket, eyes).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_reactions(issue_number: int = 0, comment_id: int = 0, content: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    url_suffix = f"?content={content}" if content else ""
+    if comment_id:
+        url = f"repos/{repo}/issues/comments/{comment_id}/reactions{url_suffix}"
+    elif issue_number:
+        url = f"repos/{repo}/issues/{issue_number}/reactions{url_suffix}"
+    else:
+        return "Provide either issue_number or comment_id."
+    try:
+        data = _gh_json("api", url, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No reactions found."
+    counts: dict[str, int] = {}
+    for r in data:
+        c = r.get("content", "?")
+        counts[c] = counts.get(c, 0) + 1
+    lines = [f"Reactions on issue/comment:"]
+    for c, n in sorted(counts.items(), key=lambda x: -x[1]):
+        lines.append(f"- :{c}: × {n}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="delete_reaction",
+    description="Delete a reaction (by the authenticated user).",
+    parameters={
+        "reaction_id": {
+            "type": "integer",
+            "description": "Reaction ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["reaction_id"],
+)
+def delete_reaction(reaction_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/reactions/{reaction_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Reaction #{reaction_id} deleted"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_release",
+    description="Update a release.",
+    parameters={
+        "release_id": {
+            "type": "integer",
+            "description": "Release ID.",
+        },
+        "tag_name": {
+            "type": "string",
+            "description": "New tag name.",
+        },
+        "name": {
+            "type": "string",
+            "description": "New release title.",
+        },
+        "body": {
+            "type": "string",
+            "description": "New release body.",
+        },
+        "draft": {
+            "type": "boolean",
+            "description": "Mark as draft.",
+        },
+        "prerelease": {
+            "type": "boolean",
+            "description": "Mark as prerelease.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["release_id"],
+)
+def update_release(release_id: int, tag_name: str = "", name: str = "", body: str = "", draft: bool | None = None, prerelease: bool | None = None, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {}
+    if tag_name:
+        payload["tag_name"] = tag_name
+    if name:
+        payload["name"] = name
+    if body:
+        payload["body"] = body
+    if draft is not None:
+        payload["draft"] = draft
+    if prerelease is not None:
+        payload["prerelease"] = prerelease
+    if not payload:
+        return "Nothing to update."
+    try:
+        _gh("api", f"repos/{repo}/releases/{release_id}", "--method", "PATCH",
+            "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        return f"Release #{release_id} updated"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_release",
+    description="Delete a release.",
+    parameters={
+        "release_id": {
+            "type": "integer",
+            "description": "Release ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["release_id"],
+)
+def delete_release(release_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/releases/{release_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Release #{release_id} deleted"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_release_assets",
+    description="List assets for a release.",
+    parameters={
+        "release_id": {
+            "type": "integer",
+            "description": "Release ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["release_id"],
+)
+def list_release_assets(release_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/releases/{release_id}/assets", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No assets found."
+    lines = []
+    for a in data:
+        name = a.get("name", "?")
+        size_kb = a.get("size", 0) // 1024
+        downloads = a.get("download_count", 0)
+        created = a.get("created_at", "?")
+        lines.append(f"- **{name}** ({size_kb} KB, downloaded {downloads} times) — {created}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="upload_release_asset",
+    description="Upload a release asset file. Provide the local file path.",
+    parameters={
+        "release_id": {
+            "type": "integer",
+            "description": "Release ID.",
+        },
+        "file": {
+            "type": "string",
+            "description": "Local file path to upload.",
+        },
+        "name": {
+            "type": "string",
+            "description": "Output filename. Defaults to the basename of the file.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["release_id", "file"],
+)
+def upload_release_asset(release_id: int, file: str, name: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import os
+    if not os.path.isfile(file):
+        return f"Error: file not found: {file}"
+    label = name or os.path.basename(file)
+    try:
+        _gh("release", "upload", str(release_id), file,
+            "--repo", repo, "--clobber", timeout=120)
+        return f"Uploaded '{label}' to release #{release_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_code_scanning_alert",
+    description="Update the status of a code scanning alert (dismiss or reopen).",
+    parameters={
+        "alert_number": {
+            "type": "integer",
+            "description": "Code scanning alert number.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["dismissed", "open"],
+            "description": "New alert state.",
+        },
+        "dismissed_reason": {
+            "type": "string",
+            "enum": ["false positive", "won't fix", "used in tests"],
+            "description": "Required when dismissing.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["alert_number", "state"],
+)
+def update_code_scanning_alert(alert_number: int, state: str, dismissed_reason: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {"state": state}
+    if state == "dismissed" and dismissed_reason:
+        payload["dismissed_reason"] = dismissed_reason
+    try:
+        _gh("api", f"repos/{repo}/code-scanning/alerts/{alert_number}", "--method", "PATCH",
+            "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        return f"Code scanning alert #{alert_number} set to {state}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_dependabot_alert",
+    description="Update the status of a Dependabot alert (dismiss or reopen).",
+    parameters={
+        "alert_number": {
+            "type": "integer",
+            "description": "Dependabot alert number.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["dismissed", "open"],
+            "description": "New alert state.",
+        },
+        "dismissed_reason": {
+            "type": "string",
+            "enum": ["fix_started", "inaccurate", "no_bandwidth", "not_used", "tolerable_risk"],
+            "description": "Required when dismissing.",
+        },
+        "dismissed_comment": {
+            "type": "string",
+            "description": "Optional comment for dismissal.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["alert_number", "state"],
+)
+def update_dependabot_alert(alert_number: int, state: str, dismissed_reason: str = "", dismissed_comment: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {"state": state}
+    if state == "dismissed":
+        if dismissed_reason:
+            payload["dismissed_reason"] = dismissed_reason
+        if dismissed_comment:
+            payload["dismissed_comment"] = dismissed_comment
+    try:
+        _gh("api", f"repos/{repo}/dependabot/alerts/{alert_number}", "--method", "PATCH",
+            "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        return f"Dependabot alert #{alert_number} set to {state}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_secret_scanning_alert",
+    description="Update the status of a secret scanning alert (dismiss or reopen).",
+    parameters={
+        "alert_number": {
+            "type": "integer",
+            "description": "Secret scanning alert number.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["dismissed", "open"],
+            "description": "New alert state.",
+        },
+        "dismissed_reason": {
+            "type": "string",
+            "enum": ["false_positive", "won't_fix", "revoked", "used_in_tests"],
+            "description": "Required when dismissing.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["alert_number", "state"],
+)
+def update_secret_scanning_alert(alert_number: int, state: str, dismissed_reason: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {"state": state}
+    if state == "dismissed" and dismissed_reason:
+        payload["dismissed_reason"] = dismissed_reason
+    try:
+        _gh("api", f"repos/{repo}/secret-scanning/alerts/{alert_number}", "--method", "PATCH",
+            "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        return f"Secret scanning alert #{alert_number} set to {state}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
@@ -3830,11 +5036,11 @@ def list_tools(category: str = "") -> str:
             cat = "prs"
         elif any(name.startswith(p) for p in ("list_label", "create_label", "update_label", "delete_label")):
             cat = "labels"
-        elif any(name.startswith(p) for p in ("list_milestone", "create_milestone", "set_issue_milestone")):
+        elif any(name.startswith(p) for p in ("list_milestone", "create_milestone", "set_issue_milestone", "get_milestone", "update_milestone", "delete_milestone")):
             cat = "milestones"
-        elif any(name.startswith(p) for p in ("list_release", "create_release")):
+        elif any(name.startswith(p) for p in ("list_release", "create_release", "update_release", "delete_release", "list_release_assets", "upload_release")):
             cat = "releases"
-        elif any(name.startswith(p) for p in ("list_workflow", "trigger_", "cancel_", "rerun_", "get_wor")):
+        elif any(name.startswith(p) for p in ("list_workflow", "trigger_", "cancel_", "rerun_", "get_wor", "delete_workflow_run", "get_workflow_run")):
             cat = "workflows"
         elif any(name.startswith(p) for p in ("search_",)):
             cat = "search"
@@ -3842,13 +5048,13 @@ def list_tools(category: str = "") -> str:
             cat = "notifications"
         elif any(name.startswith(p) for p in ("list_gist", "create_gist")):
             cat = "gists"
-        elif any(name.startswith(p) for p in ("list_deploy", "add_deploy")):
+        elif any(name.startswith(p) for p in ("list_deploy", "add_deploy", "delete_deploy")):
             cat = "deploy_keys"
-        elif any(name.startswith(p) for p in ("list_actions",)):
+        elif any(name.startswith(p) for p in ("list_actions", "delete_artifact")):
             cat = "artifacts"
-        elif any(name.startswith(p) for p in ("list_dependabot", "list_code_", "list_secret_")):
+        elif any(name.startswith(p) for p in ("list_dependabot", "list_code_", "list_secret_", "update_code_scanning", "update_dependabot", "update_secret_scanning")):
             cat = "security"
-        elif any(name.startswith(p) for p in ("list_webhook",)):
+        elif any(name.startswith(p) for p in ("list_webhook", "create_webhook", "delete_webhook", "ping_webhook")):
             cat = "webhooks"
         elif any(name.startswith(p) for p in ("get_branch",)):
             cat = "branch_protection"
@@ -3858,8 +5064,16 @@ def list_tools(category: str = "") -> str:
             cat = "repo_management"
         elif any(name.startswith(p) for p in ("watch_", "unwatch_", "community_")):
             cat = "community"
-        elif any(name.startswith(p) for p in ("render_", "list_licenses", "list_issue_events", "list_issue_template", "list_comment", "get_comment", "update_comment", "delete_comment", "list_pr_review", "list_commit", "list_tag", "create_commit_status", "compare_refs", "whoami", "rate_limit", "list_collab", "add_collab", "remove_collab", "list_branches", "delete_branch", "bulk_")):
+        elif any(name.startswith(p) for p in ("render_", "list_licenses", "list_issue_events", "list_issue_template", "list_comment", "get_comment", "update_comment", "delete_comment", "list_pr_review", "list_commit", "list_tag", "create_commit_status", "compare_refs", "whoami", "rate_limit", "list_collab", "add_collab", "remove_collab", "list_branches", "delete_branch", "bulk_", "get_repo_content", "list_forks", "list_commit_statuses", "get_combined_commit_status", "create_git_ref", "delete_git_ref", "list_reactions", "delete_reaction", "get_commit")):
             cat = "other"
+        elif any(name.startswith(p) for p in ("set_repo_secret", "delete_repo_secret", "set_repo_variable", "delete_repo_variable")):
+            cat = "secrets_vars"
+        elif any(name.startswith(p) for p in ("create_environment", "delete_environment")):
+            cat = "environments"
+        elif any(name.startswith(p) for p in ("create_deployment", "list_deployment_statuses")):
+            cat = "deployments"
+        elif any(name.startswith(p) for p in ("get_branch",)):
+            cat = "branches"
         groups.setdefault(cat, []).append(f"  - `{name}`: {desc}")
 
     if category:

@@ -135,6 +135,22 @@ Other:
 - list_issue_templates: List available issue template files
 - create_repo_from_template: Generate repo from template
 - list_tools: List all available tools grouped by category
+- get_workflow_run / delete_workflow_run / delete_artifact: Actions run management
+- set_repo_secret / delete_repo_secret / set_repo_variable / delete_repo_variable: Secrets & variables CRUD
+- create_webhook / delete_webhook / ping_webhook: Webhook lifecycle
+- get_milestone / update_milestone / delete_milestone: Milestone lifecycle
+- delete_deploy_key: Remove deploy key
+- get_branch: Detailed branch info
+- create_environment / delete_environment: Environment lifecycle
+- create_deployment / list_deployment_statuses: Deployment management
+- get_commit: Detailed commit info with stats
+- get_repo_content: Read files/dirs from repository
+- list_forks: List forks of a repo
+- list_commit_statuses / get_combined_commit_status: Commit statuses
+- create_git_ref / delete_git_ref: Git refs (branches/tags) CRUD
+- list_reactions / delete_reaction: Reaction management
+- update_release / delete_release / list_release_assets / upload_release_asset: Full release lifecycle + assets
+- update_code_scanning_alert / update_dependabot_alert / update_secret_scanning_alert: Alert state management
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.
