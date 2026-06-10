@@ -11238,6 +11238,109 @@ def update_org_webhook(org: str, hook_id: str, config_url: str = "", config_secr
 
 
 @tool(
+    name="replace_all_repo_topics",
+    description="Replace all topics on a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "topics": {"type": "string", "description": "Comma-separated list of topic names"},
+    },
+    required=["repo", "topics"],
+)
+def replace_all_repo_topics(repo: str, topics: str) -> str:
+    try:
+        import json as j
+        topic_list = [t.strip() for t in topics.split(",") if t.strip()]
+        return _gh("api", f"repos/{repo}/topics", "--method", "PUT",
+                    "--raw-field", j.dumps({"names": topic_list}))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_commit_comment",
+    description="Get a specific commit comment by ID.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "comment_id": {"type": "string", "description": "Comment ID"},
+    },
+    required=["repo", "comment_id"],
+)
+def get_commit_comment(repo: str, comment_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/comments/{comment_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_commit_comment",
+    description="Update a commit comment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "comment_id": {"type": "string", "description": "Comment ID"},
+        "body": {"type": "string", "description": "Updated comment body"},
+    },
+    required=["repo", "comment_id", "body"],
+)
+def update_commit_comment(repo: str, comment_id: str, body: str) -> str:
+    try:
+        import json as j
+        return _gh("api", f"repos/{repo}/comments/{comment_id}", "--method", "PATCH",
+                    "--raw-field", j.dumps({"body": body}))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_commit_comment",
+    description="Delete a commit comment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "comment_id": {"type": "string", "description": "Comment ID"},
+    },
+    required=["repo", "comment_id"],
+)
+def delete_commit_comment(repo: str, comment_id: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/comments/{comment_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Commit comment {comment_id} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_label",
+    description="Get a specific label by name.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "name": {"type": "string", "description": "Label name"},
+    },
+    required=["repo", "name"],
+)
+def get_label(repo: str, name: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/labels/{name.replace(' ', '%20').replace('/', '%2F')}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_issue_labels_for_milestone",
+    description="List labels for every issue in a milestone.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "milestone_number": {"type": "string", "description": "Milestone number"},
+    },
+    required=["repo", "milestone_number"],
+)
+def list_issue_labels_for_milestone(repo: str, milestone_number: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/milestones/{milestone_number}/labels")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
