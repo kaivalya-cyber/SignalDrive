@@ -8210,6 +8210,592 @@ def copy_issue_to_repo(number: int, target: str, repo: str = "") -> str:
 
 
 @tool(
+    name="create_sub_issue",
+    description="Create a sub-issue on an issue.",
+    parameters={
+        "parent": {
+            "type": "integer",
+            "description": "Parent issue number.",
+        },
+        "title": {
+            "type": "string",
+            "description": "Sub-issue title.",
+        },
+        "body": {
+            "type": "string",
+            "description": "Sub-issue body.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["parent", "title"],
+)
+def create_sub_issue(parent: int, title: str, body: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = j.dumps({"title": title, "body": body})
+    try:
+        sub = _gh_json("api", f"repos/{repo}/issues", "--method", "POST",
+                       "--raw-field", payload, timeout=15)
+    except RuntimeError as e:
+        return f"Error creating sub-issue: {e}"
+    sub_num = sub.get("number", "?")
+    link_payload = j.dumps({"sub_issue_url": f"https://github.com/{repo}/issues/{sub_num}"})
+    try:
+        _gh("api", f"repos/{repo}/issues/{parent}/sub_issues", "--method", "POST",
+            "--raw-field", link_payload, "--silent", timeout=15)
+        return f"Sub-issue #{sub_num} created and linked to #{parent}"
+    except RuntimeError as e:
+        return f"Sub-issue #{sub_num} created (but linking failed: {e})"
+
+
+@tool(
+    name="list_sub_issues",
+    description="List sub-issues for a parent issue.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Parent issue number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def list_sub_issues(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/issues/{number}/sub_issues", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No sub-issues."
+    lines = []
+    for s in data:
+        s_num = s.get("number", "?")
+        s_title = s.get("title", "?")
+        s_state = s.get("state", "?")
+        lines.append(f"- **#{s_num}** ({s_state}): {s_title}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_copilot_billing",
+    description="Get Copilot billing and seat information for an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+    },
+    required=["org"],
+)
+def get_copilot_billing(org: str) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/copilot/billing", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return (
+        f"**Seat breakdown for {org}:**\n"
+        f"**Total seats:** {data.get('seat_breakdown', {}).get('total', 0)}\n"
+        f"**Used:** {data.get('seat_breakdown', {}).get('used', 0)}\n"
+        f"**Remaining:** {data.get('seat_breakdown', {}).get('remaining', 0)}\n"
+        f"**Purchased:** {data.get('seat_breakdown', {}).get('purchased_this_cycle', 0)}\n"
+        f"**Pending invite:** {data.get('seat_breakdown', {}).get('pending_invitation', 0)}\n"
+        f"**Active:** {data.get('seat_breakdown', {}).get('active_this_cycle', 0)}\n"
+        f"**Plan:** {data.get('plan_type', '?')}"
+    )
+
+
+@tool(
+    name="list_copilot_seats",
+    description="List Copilot seats assigned in an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=["org"],
+)
+def list_copilot_seats(org: str, limit: int = 20) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/copilot/billing/seats?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    seats = data.get("seats", [])
+    if not seats:
+        return "No Copilot seats."
+    lines = []
+    for s in seats:
+        assignee = s.get("assignee", {}).get("login", "?")
+        created = s.get("created_at", "?")
+        team = s.get("assigning_team", {})
+        team_str = f" (via {team.get('name', '?')})" if team else ""
+        lines.append(f"- **{assignee}**{team_str} — {created}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="assign_copilot_seat",
+    description="Assign a Copilot seat to a user in an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "username": {
+            "type": "string",
+            "description": "GitHub username.",
+        },
+    },
+    required=["org", "username"],
+)
+def assign_copilot_seat(org: str, username: str) -> str:
+    import json as j
+    payload = j.dumps({"selected_usernames": [username]})
+    try:
+        result = _gh_json("api", f"orgs/{org}/copilot/billing/selected_users", "--method", "POST",
+                          "--raw-field", payload, timeout=15)
+        created = result.get("seats_created", 0)
+        return f"Copilot seat assigned to {username} (seats created: {created})"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_copilot_seat",
+    description="Remove a Copilot seat from a user in an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "username": {
+            "type": "string",
+            "description": "GitHub username.",
+        },
+    },
+    required=["org", "username"],
+)
+def remove_copilot_seat(org: str, username: str) -> str:
+    import json as j
+    payload = j.dumps({"selected_usernames": [username]})
+    try:
+        result = _gh_json("api", f"orgs/{org}/copilot/billing/selected_users", "--method", "DELETE",
+                          "--raw-field", payload, timeout=15)
+        deleted = result.get("seats_cancelled", 0)
+        return f"Copilot seat removed from {username} (seats cancelled: {deleted})"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_audit_log",
+    description="Get the audit log for an organization (requires admin permissions).",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "phrase": {
+            "type": "string",
+            "description": "Search phrase/query (e.g. 'action:repo.create').",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["org"],
+)
+def get_audit_log(org: str, phrase: str = "", limit: int = 10) -> str:
+    url = f"orgs/{org}/audit-log?per_page={limit}"
+    if phrase:
+        url += f"&phrase={phrase}"
+    try:
+        data = _gh_json("api", url, timeout=30)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No audit log entries."
+    lines = [f"**Audit log for {org}:**\n"]
+    for entry in data[:limit]:
+        action = entry.get("action", "?")
+        actor = entry.get("actor", "?")
+        created = entry.get("created_at", "?")
+        repo = entry.get("repo", "")
+        repo_str = f" in {repo}" if repo else ""
+        lines.append(f"- **{actor}** → `{action}`{repo_str} — {created}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_notification_thread",
+    description="Get a single notification thread.",
+    parameters={
+        "thread_id": {
+            "type": "string",
+            "description": "Notification thread ID.",
+        },
+    },
+    required=["thread_id"],
+)
+def get_notification_thread(thread_id: str) -> str:
+    try:
+        data = _gh_json("api", f"notifications/threads/{thread_id}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    subject = data.get("subject", {})
+    return (
+        f"**{subject.get('title', '?')}**\n"
+        f"**Type:** {subject.get('type', '?')} (url: {subject.get('url', '?')})\n"
+        f"**Reason:** {data.get('reason', '?')}\n"
+        f"**Unread:** {data.get('unread', False)}\n"
+        f"**Updated:** {data.get('updated_at', '?')}"
+    )
+
+
+@tool(
+    name="mark_thread_done",
+    description="Mark a notification thread as done (dismisses it).",
+    parameters={
+        "thread_id": {
+            "type": "string",
+            "description": "Notification thread ID.",
+        },
+    },
+    required=["thread_id"],
+)
+def mark_thread_done(thread_id: str) -> str:
+    try:
+        _gh("api", f"notifications/threads/{thread_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Thread {thread_id} marked as done"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_thread_subscription",
+    description="Set notification thread subscription (watch/unwatch/ignore).",
+    parameters={
+        "thread_id": {
+            "type": "string",
+            "description": "Notification thread ID.",
+        },
+        "subscribed": {
+            "type": "boolean",
+            "description": "Whether to subscribe.",
+        },
+        "ignored": {
+            "type": "boolean",
+            "description": "Whether to ignore the thread.",
+        },
+    },
+    required=["thread_id", "subscribed"],
+)
+def set_thread_subscription(thread_id: str, subscribed: bool, ignored: bool = False) -> str:
+    import json as j
+    payload = j.dumps({"subscribed": subscribed, "ignored": ignored})
+    try:
+        _gh("api", f"notifications/threads/{thread_id}/subscription", "--method", "PUT",
+            "--raw-field", payload, "--silent", timeout=15)
+        return f"Thread {thread_id} subscription set (subscribed: {subscribed}, ignored: {ignored})"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_feeds",
+    description="Get GitHub feeds available to the authenticated user.",
+    parameters={},
+    required=[],
+)
+def get_feeds() -> str:
+    try:
+        data = _gh_json("api", "feeds", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    lines = []
+    for key, value in data.items():
+        if key.endswith("_url"):
+            label = key.replace("_url", "").replace("_", " ").title()
+            lines.append(f"- **{label}:** {value}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_check_suite",
+    description="Create a check suite for a commit SHA.",
+    parameters={
+        "head_sha": {
+            "type": "string",
+            "description": "Commit SHA.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["head_sha"],
+)
+def create_check_suite(head_sha: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = j.dumps({"head_sha": head_sha})
+    try:
+        data = _gh_json("api", f"repos/{repo}/check-suites", "--method", "POST",
+                        "--raw-field", payload, timeout=15)
+        suite_id = data.get("id", "?")
+        return f"Check suite #{suite_id} created for {head_sha[:7]}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="rerequest_check_suite",
+    description="Re-request a check suite (re-run checks).",
+    parameters={
+        "suite_id": {
+            "type": "integer",
+            "description": "Check suite ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["suite_id"],
+)
+def rerequest_check_suite(suite_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/check-suites/{suite_id}/rerequest", "--method", "POST", "--silent", timeout=15)
+        return f"Check suite #{suite_id} re-requested"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_check_runs_for_ref",
+    description="List check runs for a commit SHA.",
+    parameters={
+        "sha": {
+            "type": "string",
+            "description": "Commit SHA.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["sha"],
+)
+def list_check_runs_for_ref(sha: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/commits/{sha}/check-runs", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    runs = data.get("check_runs", [])
+    if not runs:
+        return "No check runs."
+    lines = [f"**Check runs for {sha[:7]}:**\n"]
+    for cr in runs:
+        name = cr.get("name", "?")
+        status = cr.get("status", "?")
+        conclusion = cr.get("conclusion", "")
+        concl = f" — {conclusion}" if conclusion else ""
+        lines.append(f"- **{name}**: {status}{concl}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_repo_security_advisories",
+    description="List repository security advisories.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "description": "Filter by state: open, closed, published.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def get_repo_security_advisories(repo: str = "", state: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    url = f"repos/{repo}/security-advisories?per_page={limit}"
+    if state:
+        url += f"&state={state}"
+    try:
+        data = _gh_json("api", url, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No security advisories."
+    lines = [f"**Security advisories for {repo}:**\n"]
+    for a in data:
+        ghsa = a.get("ghsa_id", "?")
+        cve = a.get("cve_id", "none") or "none"
+        summary = a.get("summary", "?")[:80]
+        severity = a.get("severity", "?")
+        state = a.get("state", "?")
+        published = a.get("published_at", "?")
+        lines.append(f"- **{ghsa}** (CVE: {cve}) — {summary} — {severity}/{state} — {published}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_environment_secrets",
+    description="List secrets for a deployment environment.",
+    parameters={
+        "env": {
+            "type": "string",
+            "description": "Environment name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["env"],
+)
+def list_environment_secrets(env: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/environments/{env}/secrets", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    secrets = data.get("secrets", [])
+    if not secrets:
+        return "No environment secrets."
+    lines = []
+    for s in secrets:
+        lines.append(f"- `{s['name']}` (created: {s.get('created_at', '?')})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_merge_queue_config",
+    description="Get the merge queue configuration for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_merge_queue_config(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/merge-queue/configuration", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return json.dumps(data, indent=2)
+
+
+@tool(
+    name="list_org_custom_roles",
+    description="List custom repository roles for an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+    },
+    required=["org"],
+)
+def list_org_custom_roles(org: str) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/custom-repo-roles", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    roles = data.get("roles", [])
+    if not roles:
+        return "No custom roles."
+    lines = []
+    for r in roles:
+        name = r.get("name", "?")
+        rid = r.get("id", "?")
+        desc = r.get("description", "")
+        base = r.get("base_role", "?")
+        desc_str = f" — {desc}" if desc else ""
+        lines.append(f"- **{name}** (id={rid}, base: {base}){desc_str}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="update_review_comment",
+    description="Update a pull request review comment.",
+    parameters={
+        "comment_id": {
+            "type": "integer",
+            "description": "Review comment ID.",
+        },
+        "body": {
+            "type": "string",
+            "description": "New comment body.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["comment_id", "body"],
+)
+def update_review_comment(comment_id: int, body: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = j.dumps({"body": body})
+    try:
+        _gh("api", f"repos/{repo}/pulls/comments/{comment_id}", "--method", "PATCH",
+            "--raw-field", payload, "--silent", timeout=15)
+        return f"Review comment #{comment_id} updated"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_review_comment",
+    description="Delete a pull request review comment.",
+    parameters={
+        "comment_id": {
+            "type": "integer",
+            "description": "Review comment ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["comment_id"],
+)
+def delete_review_comment(comment_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/pulls/comments/{comment_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Review comment #{comment_id} deleted"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
@@ -8244,7 +8830,7 @@ def list_tools(category: str = "") -> str:
             cat = "workflows"
         elif any(name.startswith(p) for p in ("search_",)):
             cat = "search"
-        elif any(name.startswith(p) for p in ("list_notif", "mark_notif")):
+        elif any(name.startswith(p) for p in ("list_notif", "mark_notif", "get_notification", "mark_thread", "set_thread")):
             cat = "notifications"
         elif any(name.startswith(p) for p in ("list_gist", "create_gist")):
             cat = "gists"
@@ -8280,7 +8866,7 @@ def list_tools(category: str = "") -> str:
             cat = "rulesets"
         elif any(name.startswith(p) for p in ("list_autolinks", "create_autolink", "delete_autolink")):
             cat = "autolinks"
-        elif any(name.startswith(p) for p in ("create_check_run",)):
+        elif any(name.startswith(p) for p in ("create_check_run", "create_check_suite", "rerequest_check_suite", "list_check_runs")):
             cat = "checks"
         elif any(name.startswith(p) for p in ("get_webhook", "update_webhook")):
             cat = "webhooks"
@@ -8288,13 +8874,13 @@ def list_tools(category: str = "") -> str:
             cat = "deploy_keys"
         elif any(name.startswith(p) for p in ("add_issue_labels", "set_issue_labels")):
             cat = "issues"
-        elif any(name.startswith(p) for p in ("get_actions_billing",)):
+        elif any(name.startswith(p) for p in ("get_actions_billing", "get_copilot_billing", "list_copilot_seats", "assign_copilot", "remove_copilot")):
             cat = "billing"
         elif any(name.startswith(p) for p in ("list_repo_invitations", "enable_vulnerability", "disable_vulnerability", "enable_automatic", "disable_automatic", "get_repo_interaction", "set_repo_interaction", "remove_repo_interaction", "get_repo_custom")):
             cat = "repo_management"
         elif any(name.startswith(p) for p in ("list_org_webhook", "create_org_webhook", "delete_org_webhook")):
             cat = "webhooks"
-        elif any(name.startswith(p) for p in ("check_org_membership", "get_org_membership", "get_org_teams", "list_org_secrets", "get_org_blocked", "get_org_outside", "list_org_invitations")):
+        elif any(name.startswith(p) for p in ("check_org_membership", "get_org_membership", "get_org_teams", "list_org_secrets", "get_org_blocked", "get_org_outside", "list_org_invitations", "get_audit", "list_org_custom", "list_org_vulnerability")):
             cat = "organizations"
         elif any(name.startswith(p) for p in ("set_team_membership", "remove_team_member")):
             cat = "teams"
@@ -8308,7 +8894,7 @@ def list_tools(category: str = "") -> str:
             cat = "apps"
         elif any(name.startswith(p) for p in ("create_commit",)):
             cat = "git"
-        elif any(name.startswith(p) for p in ("check_if_following", "list_stargazers", "list_watchers", "get_dependency_diff")):
+        elif any(name.startswith(p) for p in ("check_if_following", "list_stargazers", "list_watchers", "get_dependency_diff", "update_review_comment", "delete_review_comment", "get_feeds", "get_merge_queue_config")):
             cat = "other"
         elif any(name.startswith(p) for p in ("get_issue_timeline",)):
             cat = "issues"
@@ -8316,7 +8902,7 @@ def list_tools(category: str = "") -> str:
             cat = "rulesets"
         elif any(name.startswith(p) for p in ("get_meta", "get_octocat", "get_zen")):
             cat = "utility"
-        elif any(name.startswith(p) for p in ("copy_issue",)):
+        elif any(name.startswith(p) for p in ("copy_issue", "create_sub_issue", "list_sub_issues")):
             cat = "issues"
         elif any(name.startswith(p) for p in ("update_pull_request",)):
             cat = "prs"
