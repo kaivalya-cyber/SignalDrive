@@ -10235,6 +10235,99 @@ def rerun_workflow_failed_jobs(repo: str, run_id: str) -> str:
 
 
 @tool(
+    name="list_runner_applications",
+    description="List runner applications available for download.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def list_runner_applications(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/actions/runners/downloads")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_registration_token",
+    description="Create a registration token for adding a new self-hosted runner.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def create_registration_token(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/actions/runners/registration-token", "--method", "POST")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_remove_token",
+    description="Create a remove token for removing a self-hosted runner.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def create_remove_token(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/actions/runners/remove-token", "--method", "POST")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_runner",
+    description="Get details of a specific self-hosted runner.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "runner_id": {"type": "string", "description": "Runner ID"},
+    },
+    required=["repo", "runner_id"],
+)
+def get_runner(repo: str, runner_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/actions/runners/{runner_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_runner",
+    description="Remove a self-hosted runner from a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "runner_id": {"type": "string", "description": "Runner ID"},
+    },
+    required=["repo", "runner_id"],
+)
+def remove_runner(repo: str, runner_id: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/actions/runners/{runner_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Runner #{runner_id} removed from {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_runner_groups",
+    description="List self-hosted runner groups for a repository.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def list_runner_groups(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/actions/runner-groups")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
