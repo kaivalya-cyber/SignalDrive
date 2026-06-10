@@ -10144,6 +10144,97 @@ def delete_environment_variable(repo: str, env: str, name: str) -> str:
 
 
 @tool(
+    name="list_workflow_run_jobs",
+    description="List jobs for a workflow run.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "run_id": {"type": "string", "description": "Workflow run ID"},
+        "filter": {"type": "string", "description": "Filter by status: latest, all (default: latest)"},
+    },
+    required=["repo", "run_id"],
+)
+def list_workflow_run_jobs(repo: str, run_id: str, filter: str = "latest") -> str:
+    try:
+        args = ["run", "view", run_id, "--repo", repo, "--json", "jobs"]
+        result = _gh_json(*args)
+        jobs = result.get("jobs", [])
+        if not jobs:
+            return f"No jobs found for run #{run_id}."
+        return json.dumps(jobs, indent=2)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_workflow_run_job",
+    description="Get details of a specific job in a workflow run.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "job_id": {"type": "string", "description": "Job ID"},
+    },
+    required=["repo", "job_id"],
+)
+def get_workflow_run_job(repo: str, job_id: str) -> str:
+    try:
+        return _gh("run", "view", "--job", job_id, "--repo", repo, "--json",
+                    "steps,started_at,completed_at,conclusion,status,name")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="download_workflow_run_job_logs",
+    description="Download logs for a specific workflow run job.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "job_id": {"type": "string", "description": "Job ID"},
+    },
+    required=["repo", "job_id"],
+)
+def download_workflow_run_job_logs(repo: str, job_id: str) -> str:
+    try:
+        result = _gh("run", "view", "--job", job_id, "--repo", repo, "--log")
+        return f"Logs for job #{job_id}:\n{result[:2000]}" + ("\n...(truncated)" if len(result) > 2000 else "")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="approve_workflow_run",
+    description="Approve a workflow run that requires approval.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "run_id": {"type": "string", "description": "Workflow run ID"},
+    },
+    required=["repo", "run_id"],
+)
+def approve_workflow_run(repo: str, run_id: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/actions/runs/{run_id}/approve", "--method", "POST",
+            "--silent", timeout=15)
+        return f"Workflow run #{run_id} approved."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="rerun_workflow_failed_jobs",
+    description="Rerun only the failed jobs in a workflow run.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "run_id": {"type": "string", "description": "Workflow run ID"},
+    },
+    required=["repo", "run_id"],
+)
+def rerun_workflow_failed_jobs(repo: str, run_id: str) -> str:
+    try:
+        _gh("run", "rerun", run_id, "--repo", repo, "--failed", timeout=15)
+        return f"Rerunning failed jobs for run #{run_id}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
