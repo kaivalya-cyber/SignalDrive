@@ -11639,6 +11639,126 @@ def disable_private_vulnerability_reporting(repo: str) -> str:
 
 
 @tool(
+    name="get_workflow_dispatch_inputs",
+    description="Get the input schema for a workflow that supports workflow_dispatch.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "workflow_id": {"type": "string", "description": "Workflow ID or filename"},
+    },
+    required=["repo", "workflow_id"],
+)
+def get_workflow_dispatch_inputs(repo: str, workflow_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/actions/workflows/{workflow_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_ruleset",
+    description="Get a single ruleset for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "ruleset_id": {"type": "string", "description": "Ruleset ID"},
+    },
+    required=["repo", "ruleset_id"],
+)
+def get_repo_ruleset(repo: str, ruleset_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/rulesets/{ruleset_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_ruleset",
+    description="Update a repository ruleset.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "ruleset_id": {"type": "string", "description": "Ruleset ID"},
+        "name": {"type": "string", "description": "New ruleset name"},
+        "enforcement": {"type": "string", "description": "Enforcement level: active, disabled, evaluate"},
+        "bypass_mode": {"type": "string", "description": "Bypass mode: always, none"},
+        "conditions": {"type": "string", "description": "JSON conditions (optional)"},
+        "rules": {"type": "string", "description": "JSON rules array (optional)"},
+    },
+    required=["repo", "ruleset_id"],
+)
+def update_ruleset(repo: str, ruleset_id: str, name: str = "", enforcement: str = "",
+                    bypass_mode: str = "", conditions: str = "", rules: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if name:
+            payload["name"] = name
+        if enforcement:
+            payload["enforcement"] = enforcement
+        if conditions:
+            payload["conditions"] = j.loads(conditions)
+        if rules:
+            payload["rules"] = j.loads(rules)
+        return _gh("api", f"repos/{repo}/rulesets/{ruleset_id}", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_ruleset",
+    description="Delete a repository ruleset.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "ruleset_id": {"type": "string", "description": "Ruleset ID"},
+    },
+    required=["repo", "ruleset_id"],
+)
+def delete_ruleset(repo: str, ruleset_id: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/rulesets/{ruleset_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Ruleset {ruleset_id} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_org_audit_log",
+    description="Get the audit log for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "phrase": {"type": "string", "description": "Search phrase (optional)"},
+        "limit": {"type": "string", "description": "Max results (default: 10)"},
+    },
+    required=["org"],
+)
+def get_org_audit_log(org: str, phrase: str = "", limit: str = "10") -> str:
+    try:
+        args = ["api", f"orgs/{org}/audit-log?per_page={limit}"]
+        if phrase:
+            args[1] += f"&phrase={phrase.replace(' ', '+')}"
+        return _gh(*args)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_issue_comment",
+    description="Create a comment on an issue. Alias for comment_on_issue.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "number": {"type": "string", "description": "Issue number"},
+        "body": {"type": "string", "description": "Comment body text"},
+    },
+    required=["repo", "number", "body"],
+)
+def create_issue_comment(repo: str, number: str, body: str) -> str:
+    try:
+        _gh("issue", "comment", number, "--repo", repo, "--body", body)
+        return f"Commented on issue #{number}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
