@@ -11557,6 +11557,88 @@ def get_all_repo_topics(repo: str) -> str:
 
 
 @tool(
+    name="get_dependabot_alert",
+    description="Get a single Dependabot alert by number.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "alert_number": {"type": "string", "description": "Alert number"},
+    },
+    required=["repo", "alert_number"],
+)
+def get_dependabot_alert(repo: str, alert_number: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/dependabot/alerts/{alert_number}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_code_scanning_alert",
+    description="Get a single code scanning alert by number.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "alert_number": {"type": "string", "description": "Alert number"},
+    },
+    required=["repo", "alert_number"],
+)
+def get_code_scanning_alert(repo: str, alert_number: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/code-scanning/alerts/{alert_number}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_secret_scanning_alert",
+    description="Get a single secret scanning alert by number.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "alert_number": {"type": "string", "description": "Alert number"},
+    },
+    required=["repo", "alert_number"],
+)
+def get_secret_scanning_alert(repo: str, alert_number: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/secret-scanning/alerts/{alert_number}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="enable_private_vulnerability_reporting",
+    description="Enable private vulnerability reporting for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def enable_private_vulnerability_reporting(repo: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/private-vulnerability-reporting", "--method", "PUT",
+            "--silent", timeout=15)
+        return f"Private vulnerability reporting enabled for {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="disable_private_vulnerability_reporting",
+    description="Disable private vulnerability reporting for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def disable_private_vulnerability_reporting(repo: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/private-vulnerability-reporting", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Private vulnerability reporting disabled for {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
