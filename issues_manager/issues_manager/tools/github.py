@@ -11341,6 +11341,109 @@ def list_issue_labels_for_milestone(repo: str, milestone_number: str) -> str:
 
 
 @tool(
+    name="get_org_hook",
+    description="Get a single organization webhook by ID.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "hook_id": {"type": "string", "description": "Webhook ID"},
+    },
+    required=["org", "hook_id"],
+)
+def get_org_hook(org: str, hook_id: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/hooks/{hook_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="ping_org_webhook",
+    description="Ping an organization webhook to trigger a test delivery.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "hook_id": {"type": "string", "description": "Webhook ID"},
+    },
+    required=["org", "hook_id"],
+)
+def ping_org_webhook(org: str, hook_id: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/hooks/{hook_id}/pings", "--method", "POST", "--silent", timeout=15)
+        return f"Org webhook {hook_id} pinged."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_org_membership",
+    description="Set organization membership for a user.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "username": {"type": "string", "description": "GitHub username"},
+        "role": {"type": "string", "description": "Role: member (default) or admin"},
+    },
+    required=["org", "username"],
+)
+def set_org_membership(org: str, username: str, role: str = "member") -> str:
+    try:
+        import json as j
+        return _gh("api", f"orgs/{org}/memberships/{username}", "--method", "PUT",
+                    "--raw-field", j.dumps({"role": role}))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_org_membership",
+    description="Remove a user from an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "username": {"type": "string", "description": "GitHub username"},
+    },
+    required=["org", "username"],
+)
+def remove_org_membership(org: str, username: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/memberships/{username}", "--method", "DELETE", "--silent", timeout=15)
+        return f"User '{username}' removed from {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="block_org_user",
+    description="Block a user from an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "username": {"type": "string", "description": "GitHub username"},
+    },
+    required=["org", "username"],
+)
+def block_org_user(org: str, username: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/blocks/{username}", "--method", "PUT", "--silent", timeout=15)
+        return f"User '{username}' blocked from {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unblock_org_user",
+    description="Unblock a user from an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "username": {"type": "string", "description": "GitHub username"},
+    },
+    required=["org", "username"],
+)
+def unblock_org_user(org: str, username: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/blocks/{username}", "--method", "DELETE", "--silent", timeout=15)
+        return f"User '{username}' unblocked from {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
