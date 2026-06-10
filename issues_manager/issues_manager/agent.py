@@ -108,6 +108,15 @@ Other:
 - unlock_issue: Unlock conversation
 - transfer_issue: Transfer an issue to another repo
 - rate_limit: Check GitHub API rate limit status
+- list_environments: List deployment environments
+- get_pr_diff: Get PR diff content
+- list_pr_review_comments: List inline PR review comments
+- list_commits / list_tags: Browse git history (commits and tags)
+- create_commit_status: Set commit status (pending/success/failure/error)
+- enable_auto_merge / disable_auto_merge: Toggle PR auto-merge
+- list_issue_events: Get timeline events (labeled, assigned, referenced, etc.)
+- transfer_repo: Transfer repo to another user/org
+- remove_collaborator: Remove a collaborator from repo
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.

@@ -85,8 +85,15 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Workflow Mgmt | `cancel_workflow_run`, `rerun_workflow` |
 | Repo Mgmt     | `archive_repo`, `unarchive_repo`, `change_repo_visibility`, `list_repo_languages`, `get_repo_license` |
 | Reactions     | `add_reaction` |
-| Pins          | `pin_issue`, `unpin_issue` |
-| Other         | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `update_pr_branch` |
+| Pins            | `pin_issue`, `unpin_issue` |
+| PR Review       | `list_pr_review_comments`, `get_pr_diff` |
+| Git History     | `list_commits`, `list_tags` |
+| Auto-merge      | `enable_auto_merge`, `disable_auto_merge` |
+| Commit Status   | `create_commit_status` |
+| Issue Events    | `list_issue_events` |
+| Environments    | `list_environments` |
+| Repo Transfer   | `transfer_repo` |
+| Other           | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `update_pr_branch`, `remove_collaborator` |
 
 ## Architecture
 
