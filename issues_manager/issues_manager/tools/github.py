@@ -11444,6 +11444,119 @@ def unblock_org_user(org: str, username: str) -> str:
 
 
 @tool(
+    name="set_repo_topics",
+    description="Set repository topics (replaces existing).",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "topics": {"type": "string", "description": "Comma-separated topic names"},
+    },
+    required=["repo", "topics"],
+)
+def set_repo_topics(repo: str, topics: str) -> str:
+    try:
+        import json as j
+        topic_list = [t.strip() for t in topics.split(",") if t.strip()]
+        return _gh("api", f"repos/{repo}/topics", "--method", "PUT",
+                    "--raw-field", j.dumps({"names": topic_list}))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_environment",
+    description="Get a repository environment (single).",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "env": {"type": "string", "description": "Environment name"},
+    },
+    required=["repo", "env"],
+)
+def get_repo_environment(repo: str, env: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/environments/{env}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_or_update_repo_environment",
+    description="Create or update a repository environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "env": {"type": "string", "description": "Environment name"},
+        "wait_timer": {"type": "string", "description": "Wait timer in minutes (optional)"},
+        "reviewers": {"type": "string", "description": "JSON array of reviewer objects (optional)"},
+        "deployment_branch_policy": {"type": "string", "description": "JSON deployment branch policy (optional)"},
+    },
+    required=["repo", "env"],
+)
+def create_or_update_repo_environment(repo: str, env: str, wait_timer: str = "",
+                                       reviewers: str = "", deployment_branch_policy: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if wait_timer:
+            payload["wait_timer"] = int(wait_timer)
+        if reviewers:
+            payload["reviewers"] = j.loads(reviewers)
+        if deployment_branch_policy:
+            payload["deployment_branch_policy"] = j.loads(deployment_branch_policy)
+        return _gh("api", f"repos/{repo}/environments/{env}", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_repo_environment",
+    description="Delete a repository environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "env": {"type": "string", "description": "Environment name"},
+    },
+    required=["repo", "env"],
+)
+def delete_repo_environment(repo: str, env: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/environments/{env}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Environment '{env}' deleted from {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_license_content",
+    description="Get the license contents for a repository (includes the full license text).",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_license_content(repo: str) -> str:
+    try:
+        result = _gh("api", f"repos/{repo}/license")
+        data = json.loads(result)
+        return f"License: {data.get('license', {}).get('name', 'Unknown')}\nKey: {data.get('license', {}).get('key', 'Unknown')}\nPath: {data.get('path', 'N/A')}\nContent:\n{data.get('content', 'N/A')}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_all_repo_topics",
+    description="Get all topics for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_all_repo_topics(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/topics")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
