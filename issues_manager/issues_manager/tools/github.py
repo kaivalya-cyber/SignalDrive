@@ -10790,6 +10790,189 @@ def update_check_run(repo: str, run_id: str, status: str = "", conclusion: str =
 
 
 @tool(
+    name="get_package",
+    description="Get details of a package in an organization.",
+    parameters={
+        "package_type": {"type": "string", "description": "Package type: container, docker, npm, maven, rubygems, nuget, pypi"},
+        "package_name": {"type": "string", "description": "Package name"},
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["package_type", "package_name", "org"],
+)
+def get_package(package_type: str, package_name: str, org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/packages/{package_type}/{package_name}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_package_version",
+    description="Get details of a specific package version.",
+    parameters={
+        "package_type": {"type": "string", "description": "Package type: container, docker, npm, maven, rubygems, nuget, pypi"},
+        "package_name": {"type": "string", "description": "Package name"},
+        "org": {"type": "string", "description": "Organization name"},
+        "version_id": {"type": "string", "description": "Package version ID"},
+    },
+    required=["package_type", "package_name", "org", "version_id"],
+)
+def get_package_version(package_type: str, package_name: str, org: str, version_id: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/packages/{package_type}/{package_name}/versions/{version_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_package_version",
+    description="Delete a specific version of a package.",
+    parameters={
+        "package_type": {"type": "string", "description": "Package type: container, docker, npm, maven, rubygems, nuget, pypi"},
+        "package_name": {"type": "string", "description": "Package name"},
+        "org": {"type": "string", "description": "Organization name"},
+        "version_id": {"type": "string", "description": "Package version ID"},
+    },
+    required=["package_type", "package_name", "org", "version_id"],
+)
+def delete_package_version(package_type: str, package_name: str, org: str, version_id: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/packages/{package_type}/{package_name}/versions/{version_id}",
+            "--method", "DELETE", "--silent", timeout=15)
+        return f"Package version {version_id} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="restore_package",
+    description="Restore a deleted package.",
+    parameters={
+        "package_type": {"type": "string", "description": "Package type: container, docker, npm, maven, rubygems, nuget, pypi"},
+        "package_name": {"type": "string", "description": "Package name"},
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["package_type", "package_name", "org"],
+)
+def restore_package(package_type: str, package_name: str, org: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/packages/{package_type}/{package_name}/restore",
+            "--method", "POST", "--silent", timeout=15)
+        return f"Package '{package_name}' restored."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="restore_package_version",
+    description="Restore a specific deleted package version.",
+    parameters={
+        "package_type": {"type": "string", "description": "Package type: container, docker, npm, maven, rubygems, nuget, pypi"},
+        "package_name": {"type": "string", "description": "Package name"},
+        "org": {"type": "string", "description": "Organization name"},
+        "version_id": {"type": "string", "description": "Package version ID"},
+    },
+    required=["package_type", "package_name", "org", "version_id"],
+)
+def restore_package_version(package_type: str, package_name: str, org: str, version_id: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/packages/{package_type}/{package_name}/versions/{version_id}/restore",
+            "--method", "POST", "--silent", timeout=15)
+        return f"Package version {version_id} restored."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_codespace",
+    description="Create a codespace for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "branch": {"type": "string", "description": "Branch name (optional)"},
+        "machine": {"type": "string", "description": "Machine type (optional)"},
+        "location": {"type": "string", "description": "Location (optional)"},
+    },
+    required=["repo"],
+)
+def create_codespace(repo: str, branch: str = "", machine: str = "", location: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"repository": repo}
+        if branch:
+            payload["git_ref"] = branch
+        if machine:
+            payload["machine"] = machine
+        if location:
+            payload["location"] = location
+        return _gh("api", "user/codespaces", "--method", "POST", "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_codespace",
+    description="Get details of a codespace.",
+    parameters={
+        "codespace_name": {"type": "string", "description": "Codespace name"},
+    },
+    required=["codespace_name"],
+)
+def get_codespace(codespace_name: str) -> str:
+    try:
+        return _gh("api", f"user/codespaces/{codespace_name}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_codespace",
+    description="Delete a codespace.",
+    parameters={
+        "codespace_name": {"type": "string", "description": "Codespace name"},
+    },
+    required=["codespace_name"],
+)
+def delete_codespace(codespace_name: str) -> str:
+    try:
+        _gh("api", f"user/codespaces/{codespace_name}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Codespace {codespace_name} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="start_codespace",
+    description="Start a codespace.",
+    parameters={
+        "codespace_name": {"type": "string", "description": "Codespace name"},
+    },
+    required=["codespace_name"],
+)
+def start_codespace(codespace_name: str) -> str:
+    try:
+        _gh("api", f"user/codespaces/{codespace_name}/start", "--method", "POST", "--silent", timeout=30)
+        return f"Codespace {codespace_name} started."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="stop_codespace",
+    description="Stop a running codespace.",
+    parameters={
+        "codespace_name": {"type": "string", "description": "Codespace name"},
+    },
+    required=["codespace_name"],
+)
+def stop_codespace(codespace_name: str) -> str:
+    try:
+        _gh("api", f"user/codespaces/{codespace_name}/stop", "--method", "POST", "--silent", timeout=30)
+        return f"Codespace {codespace_name} stopped."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
