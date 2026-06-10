@@ -11759,6 +11759,145 @@ def create_issue_comment(repo: str, number: str, body: str) -> str:
 
 
 @tool(
+    name="get_repo_collaborator_permission",
+    description="Get the permission level for a collaborator on a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "username": {"type": "string", "description": "GitHub username"},
+    },
+    required=["repo", "username"],
+)
+def get_repo_collaborator_permission(repo: str, username: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/collaborators/{username}/permission")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="check_collaborator",
+    description="Check if a user is a collaborator on a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "username": {"type": "string", "description": "GitHub username"},
+    },
+    required=["repo", "username"],
+)
+def check_collaborator(repo: str, username: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/collaborators/{username}", "--silent", timeout=15)
+        return f"Yes, '{username}' is a collaborator on {repo}."
+    except RuntimeError as e:
+        return f"No, '{username}' is not a collaborator (or insufficient permissions)."
+
+
+@tool(
+    name="set_collaborator_permission",
+    description="Set the permission level for a collaborator on a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "username": {"type": "string", "description": "GitHub username"},
+        "permission": {"type": "string", "description": "Permission: pull, push, triage, maintain, admin"},
+    },
+    required=["repo", "username"],
+)
+def set_collaborator_permission(repo: str, username: str, permission: str = "push") -> str:
+    try:
+        _gh("api", f"repos/{repo}/collaborators/{username}", "--method", "PUT",
+            "--raw-field", json.dumps({"permission": permission}), timeout=15)
+        return f"Permission set to '{permission}' for '{username}' on {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_repo_invitation",
+    description="Cancel a repository invitation.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "invitation_id": {"type": "string", "description": "Invitation ID"},
+    },
+    required=["repo", "invitation_id"],
+)
+def delete_repo_invitation(repo: str, invitation_id: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/invitations/{invitation_id}", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Invitation {invitation_id} cancelled."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_team_discussions",
+    description="List discussions for a team.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+        "limit": {"type": "string", "description": "Max results (default: 10)"},
+    },
+    required=["org", "team_slug"],
+)
+def get_team_discussions(org: str, team_slug: str, limit: str = "10") -> str:
+    try:
+        return _gh("api", f"orgs/{org}/teams/{team_slug}/discussions?per_page={limit}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_team_membership",
+    description="Get team membership for a user.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+        "username": {"type": "string", "description": "GitHub username"},
+    },
+    required=["org", "team_slug", "username"],
+)
+def get_team_membership(org: str, team_slug: str, username: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/teams/{team_slug}/memberships/{username}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_repo_custom_properties",
+    description="List custom property values for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def list_repo_custom_properties(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/properties/values")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_repo_custom_properties",
+    description="Set custom property values for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "properties": {"type": "string", "description": "JSON object of property_name: value pairs"},
+    },
+    required=["repo", "properties"],
+)
+def set_repo_custom_properties(repo: str, properties: str) -> str:
+    try:
+        import json as j
+        props = j.loads(properties)
+        payload = [{"property_name": k, "value": v} for k, v in props.items()]
+        return _gh("api", f"repos/{repo}/properties/values", "--method", "PATCH",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
