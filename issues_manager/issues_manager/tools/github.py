@@ -9524,6 +9524,552 @@ def get_vulnerability_alerts(repo: str = "") -> str:
     },
     required=[],
 )
+@tool(
+    name="get_enterprise_audit_log",
+    description="Get the audit log for an enterprise (requires enterprise admin).",
+    parameters={
+        "enterprise": {
+            "type": "string",
+            "description": "Enterprise slug.",
+        },
+        "phrase": {
+            "type": "string",
+            "description": "Search phrase/query.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["enterprise"],
+)
+def get_enterprise_audit_log(enterprise: str, phrase: str = "", limit: int = 10) -> str:
+    url = f"enterprises/{enterprise}/audit-log?per_page={limit}"
+    if phrase:
+        url += f"&phrase={phrase}"
+    try:
+        data = _gh_json("api", url, timeout=30)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No audit log entries."
+    lines = [f"**Enterprise audit log for {enterprise}:**\n"]
+    for entry in data[:limit]:
+        action = entry.get("action", "?")
+        actor = entry.get("actor", "?")
+        created = entry.get("created_at", "?")
+        lines.append(f"- **{actor}** → `{action}` — {created}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_enterprise_consumed_licenses",
+    description="Get consumed licenses for an enterprise.",
+    parameters={
+        "enterprise": {
+            "type": "string",
+            "description": "Enterprise slug.",
+        },
+    },
+    required=["enterprise"],
+)
+def get_enterprise_consumed_licenses(enterprise: str) -> str:
+    try:
+        data = _gh_json("api", f"enterprises/{enterprise}/consumed-licenses", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No license data."
+    lines = [f"**Consumed licenses for {enterprise}:**\n"]
+    for u in data[:30]:
+        login = u.get("login", "?")
+        lines.append(f"- **{login}**")
+    if len(data) > 30:
+        lines.append(f"\n... and {len(data) - 30} more.")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_org_code_scanning_alerts",
+    description="List code scanning alerts for an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["org"],
+)
+def list_org_code_scanning_alerts(org: str, limit: int = 10) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/code-scanning/alerts?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No alerts."
+    lines = []
+    for a in data[:limit]:
+        repo = a.get("repository", {}).get("full_name", "?")
+        num = a.get("number", "?")
+        state = a.get("state", "?")
+        severity = a.get("rule", {}).get("severity", "?")
+        desc = a.get("rule", {}).get("description", "?")[:50]
+        lines.append(f"- **{repo}** #{num} ({severity}/{state}): {desc}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_org_secret_scanning_alerts",
+    description="List secret scanning alerts for an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["org"],
+)
+def list_org_secret_scanning_alerts(org: str, limit: int = 10) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/secret-scanning/alerts?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No alerts."
+    lines = []
+    for a in data[:limit]:
+        repo = a.get("repository", {}).get("full_name", "?")
+        num = a.get("number", "?")
+        state = a.get("state", "?")
+        secret_type = a.get("secret_type_display_name", "?")
+        lines.append(f"- **{repo}** #{num} ({secret_type}, {state})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_org_dependabot_alerts",
+    description="List Dependabot alerts for an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["org"],
+)
+def list_org_dependabot_alerts(org: str, limit: int = 10) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/dependabot/alerts?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No alerts."
+    lines = []
+    for a in data[:limit]:
+        repo = a.get("repository", {}).get("full_name", "?")
+        num = a.get("number", "?")
+        state = a.get("state", "?")
+        severity = a.get("security_advisory", {}).get("severity", "?")
+        summary = a.get("security_advisory", {}).get("summary", "?")[:50]
+        lines.append(f"- **{repo}** #{num} ({severity}/{state}): {summary}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_git_tag",
+    description="Get an annotated git tag object by SHA.",
+    parameters={
+        "sha": {
+            "type": "string",
+            "description": "Tag object SHA.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["sha"],
+)
+def get_git_tag(sha: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/git/tags/{sha}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return (
+        f"**Tag:** {data.get('tag', '?')}\n"
+        f"**SHA:** {data.get('sha', '?')[:7]}\n"
+        f"**Tagger:** {data.get('tagger', {}).get('name', '?')}\n"
+        f"**Message:** {data.get('message', '?')}\n"
+        f"**Object:** {data.get('object', {}).get('sha', '?')[:7]} ({data.get('object', {}).get('type', '?')})"
+    )
+
+
+@tool(
+    name="create_git_tag",
+    description="Create an annotated git tag object.",
+    parameters={
+        "tag": {
+            "type": "string",
+            "description": "Tag name.",
+        },
+        "message": {
+            "type": "string",
+            "description": "Tag message.",
+        },
+        "object_sha": {
+            "type": "string",
+            "description": "SHA of the object to tag.",
+        },
+        "object_type": {
+            "type": "string",
+            "enum": ["commit", "tree", "blob"],
+            "description": "Type of object to tag (default: commit).",
+        },
+        "tagger_name": {
+            "type": "string",
+            "description": "Tagger name.",
+        },
+        "tagger_email": {
+            "type": "string",
+            "description": "Tagger email.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["tag", "message", "object_sha"],
+)
+def create_git_tag(tag: str, message: str, object_sha: str, object_type: str = "commit", tagger_name: str = "", tagger_email: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {"tag": tag, "message": message, "object": object_sha, "type": object_type}
+    if tagger_name or tagger_email:
+        tagger = {}
+        if tagger_name:
+            tagger["name"] = tagger_name
+        if tagger_email:
+            tagger["email"] = tagger_email
+        payload["tagger"] = tagger
+    try:
+        data = _gh_json("api", f"repos/{repo}/git/tags", "--method", "POST",
+                        "--raw-field", j.dumps(payload), timeout=15)
+        sha = data.get("sha", "?")
+        return f"Git tag '{tag}' created: {sha[:7]}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="check_starred",
+    description="Check if the authenticated user has starred a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def check_starred(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"user/starred/{repo}", "--method", "GET", "--silent", timeout=15)
+        return f"✅ You have starred **{repo}**"
+    except RuntimeError as e:
+        return f"❌ You have not starred **{repo}**"
+
+
+@tool(
+    name="check_watching",
+    description="Check if the authenticated user is watching (subscribed to) a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def check_watching(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/subscription", "--method", "GET", "--silent", timeout=15)
+        return f"✅ You are watching **{repo}**"
+    except RuntimeError as e:
+        return f"❌ You are not watching **{repo}**"
+
+
+@tool(
+    name="get_root",
+    description="Get GitHub API root endpoint info.",
+    parameters={},
+    required=[],
+)
+def get_root() -> str:
+    try:
+        data = _gh_json("api", "", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return (
+        f"**API Root:** {data.get('current_user_url', '?')}\n"
+        f"**Repos URL:** {data.get('repository_url', '?')}\n"
+        f"**Feeds URL:** {data.get('feeds_url', '?')}\n"
+        f"**Emojis:** {data.get('emojis_url', '?')}\n"
+        f"**Rate limit:** {data.get('rate_limit_url', '?')}\n"
+        f"**Verifiable password:** {data.get('verifiable_password_authentication', False)}"
+    )
+
+
+@tool(
+    name="get_rate_limit_details",
+    description="Get detailed rate limit status for the authenticated user.",
+    parameters={},
+    required=[],
+)
+def get_rate_limit_details() -> str:
+    try:
+        data = _gh_json("api", "rate_limit", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    resources = data.get("resources", {})
+    lines = [f"**Rate limit details:**\n"]
+    for name, rl in resources.items():
+        limit = rl.get("limit", "?")
+        remaining = rl.get("remaining", "?")
+        reset = rl.get("reset", 0)
+        used = rl.get("used", 0)
+        import datetime
+        reset_str = datetime.datetime.fromtimestamp(reset).strftime("%H:%M:%S") if reset else "?"
+        lines.append(f"- **{name}**: {used}/{limit} used, {remaining} remaining (resets {reset_str})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_team_members",
+    description="List members of a team.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "team_slug": {
+            "type": "string",
+            "description": "Team slug.",
+        },
+        "role": {
+            "type": "string",
+            "enum": ["member", "maintainer", "all"],
+            "description": "Filter by role (default: all).",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=["org", "team_slug"],
+)
+def list_team_members(org: str, team_slug: str, role: str = "all", limit: int = 20) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/teams/{team_slug}/members?per_page={limit}&role={role}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No members found."
+    lines = [f"**Members of {org}/{team_slug}:**\n"]
+    for m in data:
+        login = m.get("login", "?")
+        lines.append(f"- **{login}**")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_pages_builds",
+    description="List GitHub Pages builds for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_pages_builds(repo: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/pages/builds?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No builds."
+    lines = [f"**Pages builds for {repo}:**\n"]
+    for b in data:
+        status = b.get("status", "?")
+        commit = b.get("commit", "?")[:7]
+        created = b.get("created_at", "?")
+        duration = b.get("duration", 0)
+        lines.append(f"- **{status}** ({commit}) — {duration}s — {created}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="request_pages_build",
+    description="Request a GitHub Pages build for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def request_pages_build(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/pages/builds", "--method", "POST", "--silent", timeout=15)
+        return f"Pages build requested for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_actions_permissions",
+    description="Get GitHub Actions permissions for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_actions_permissions(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/permissions", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return json.dumps(data, indent=2)
+
+
+@tool(
+    name="set_actions_permissions",
+    description="Set GitHub Actions permissions for a repository.",
+    parameters={
+        "enabled": {
+            "type": "boolean",
+            "description": "Whether Actions is enabled.",
+        },
+        "allowed_actions": {
+            "type": "string",
+            "enum": ["all", "local_only", "selected"],
+            "description": "Allow actions policy.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["enabled"],
+)
+def set_actions_permissions(enabled: bool, allowed_actions: str = "all", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = j.dumps({"enabled": enabled, "allowed_actions": allowed_actions})
+    try:
+        _gh("api", f"repos/{repo}/actions/permissions", "--method", "PUT",
+            "--raw-field", payload, "--silent", timeout=15)
+        return f"Actions permissions set for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_code_scanning_default_setup",
+    description="Get the code scanning default setup configuration for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_code_scanning_default_setup(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/code-scanning/default-setup", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return json.dumps(data, indent=2)
+
+
+@tool(
+    name="update_code_scanning_default_setup",
+    description="Update the code scanning default setup configuration for a repository.",
+    parameters={
+        "state": {
+            "type": "string",
+            "enum": ["configured", "not-configured"],
+            "description": "New state.",
+        },
+        "languages": {
+            "type": "string",
+            "description": "Comma-separated languages to scan (e.g. python,javascript).",
+        },
+        "query_suite": {
+            "type": "string",
+            "description": "CodeQL query suite (default, extended).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["state"],
+)
+def update_code_scanning_default_setup(state: str, languages: str = "", query_suite: str = "default", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {"state": state, "query_suite": query_suite}
+    if languages:
+        payload["languages"] = [l.strip() for l in languages.split(",") if l.strip()]
+    try:
+        _gh("api", f"repos/{repo}/code-scanning/default-setup", "--method", "PATCH",
+            "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        return f"Code scanning default setup updated for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_tools",
+    description="List all available tools in the GitHub Issues Manager with descriptions.",
+    parameters={
+        "category": {
+            "type": "string",
+            "description": "Optional category to filter by (issues, prs, labels, workflows, etc.).",
+        },
+    },
+    required=[],
+)
 def list_tools(category: str = "") -> str:
     from . import REGISTRY
     if not REGISTRY:
