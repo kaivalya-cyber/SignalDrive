@@ -203,6 +203,19 @@ Other:
 - create_commit: Low-level git commit creation
 - check_if_following: Check follow status
 - get_repo_custom_properties: Custom property values
+- get_environment: Single environment details
+- list_stargazers / list_watchers: Star/watcher list
+- get_latest_release / get_release_by_tag / get_release: Release retrieval
+- get_meta / get_octocat / get_zen: GitHub API meta info and fun
+- list_secret_scanning_locations: Secret locations for alert
+- list_code_scanning_analyses / delete_code_scanning_analysis / upload_sarif: Code scanning CRUD
+- get_dependency_diff: Dependency review diff
+- create_tag_protection / delete_tag_protection: Tag protection CRUD
+- get_ruleset / create_ruleset: Ruleset details/creation
+- get_issue_timeline: Full issue events timeline
+- get_org_blocked_users / get_org_outside_collaborators / list_org_invitations: Org management
+- list_user_gpg_keys / list_user_ssh_keys: User keys
+- copy_issue_to_repo: Cross-repo issue copy
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.
