@@ -10973,6 +10973,150 @@ def stop_codespace(codespace_name: str) -> str:
 
 
 @tool(
+    name="update_branch_protection",
+    description="Update branch protection rules.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "branch": {"type": "string", "description": "Branch name"},
+        "required_status_checks": {"type": "string", "description": "JSON: list of contexts that must pass"},
+        "enforce_admins": {"type": "string", "description": "true/false: include admins"},
+        "require_pull_request": {"type": "string", "description": "true/false: require PR reviews"},
+        "dismiss_stale_reviews": {"type": "string", "description": "true/false: dismiss stale reviews"},
+        "require_code_owner_reviews": {"type": "string", "description": "true/false: require code owner review"},
+        "required_approving_review_count": {"type": "string", "description": "Number of required approvals"},
+    },
+    required=["repo", "branch"],
+)
+def update_branch_protection(repo: str, branch: str,
+                              required_status_checks: str = "", enforce_admins: str = "",
+                              require_pull_request: str = "", dismiss_stale_reviews: str = "",
+                              require_code_owner_reviews: str = "", required_approving_review_count: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if required_status_checks:
+            payload["required_status_checks"] = {
+                "strict": True,
+                "contexts": j.loads(required_status_checks) if isinstance(required_status_checks, str) else required_status_checks
+            }
+        if enforce_admins:
+            payload["enforce_admins"] = enforce_admins.lower() == "true"
+        if require_pull_request:
+            pr: dict = {}
+            if dismiss_stale_reviews:
+                pr["dismiss_stale_reviews"] = dismiss_stale_reviews.lower() == "true"
+            if require_code_owner_reviews:
+                pr["require_code_owner_reviews"] = require_code_owner_reviews.lower() == "true"
+            if required_approving_review_count:
+                pr["required_approving_review_count"] = int(required_approving_review_count)
+            payload["required_pull_request_reviews"] = pr
+        return _gh("api", f"repos/{repo}/branches/{branch}/protection", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_branch_protection",
+    description="Delete branch protection for a branch.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "branch": {"type": "string", "description": "Branch name"},
+    },
+    required=["repo", "branch"],
+)
+def delete_branch_protection(repo: str, branch: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/branches/{branch}/protection", "--method", "DELETE", "--silent", timeout=15)
+        return f"Branch protection removed from '{branch}'."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_branches_for_head_commit",
+    description="List branches that contain a specific commit SHA.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "sha": {"type": "string", "description": "Commit SHA"},
+    },
+    required=["repo", "sha"],
+)
+def list_branches_for_head_commit(repo: str, sha: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/commits/{sha}/branches-where-head")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_deployment_status",
+    description="Create a deployment status for a deployment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "deployment_id": {"type": "string", "description": "Deployment ID"},
+        "state": {"type": "string", "description": "State: error, failure, inactive, in_progress, queued, pending, success"},
+        "log_url": {"type": "string", "description": "Log URL (optional)"},
+        "description": {"type": "string", "description": "Description (optional)"},
+        "environment": {"type": "string", "description": "Environment name (optional)"},
+        "environment_url": {"type": "string", "description": "Environment URL (optional)"},
+    },
+    required=["repo", "deployment_id", "state"],
+)
+def create_deployment_status(repo: str, deployment_id: str, state: str,
+                              log_url: str = "", description: str = "",
+                              environment: str = "", environment_url: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"state": state}
+        if log_url:
+            payload["log_url"] = log_url
+        if description:
+            payload["description"] = description
+        if environment:
+            payload["environment"] = environment
+        if environment_url:
+            payload["environment_url"] = environment_url
+        return _gh("api", f"repos/{repo}/deployments/{deployment_id}/statuses", "--method", "POST",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_deployment",
+    description="Get a specific deployment by ID.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "deployment_id": {"type": "string", "description": "Deployment ID"},
+    },
+    required=["repo", "deployment_id"],
+)
+def get_deployment(repo: str, deployment_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/deployments/{deployment_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_deployment_status",
+    description="Get a specific deployment status by ID.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "deployment_id": {"type": "string", "description": "Deployment ID"},
+        "status_id": {"type": "string", "description": "Deployment status ID"},
+    },
+    required=["repo", "deployment_id", "status_id"],
+)
+def get_deployment_status(repo: str, deployment_id: str, status_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/deployments/{deployment_id}/statuses/{status_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
