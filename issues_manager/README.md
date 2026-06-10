@@ -60,6 +60,55 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 3. Tools execute via the `gh` CLI
 4. Results go back to the LLM for a final response
 
+## Tools
+
+| Category     | Tools |
+|-------------|-------|
+| Issues      | `list_issues`, `view_issue`, `create_issue`, `close_issue`, `reopen_issue`, `comment_on_issue`, `edit_issue`, `search_issues`, `add_issue_assignees`, `lock_issue`, `unlock_issue` |
+| Pull Requests | `list_pull_requests`, `view_pull_request`, `create_pull_request`, `merge_pull_request`, `add_pr_review` |
+| Labels      | `list_labels`, `create_label` |
+| Milestones  | `list_milestones` |
+| Releases    | `list_releases`, `create_release` |
+| Workflows   | `list_workflows`, `list_workflow_runs`, `trigger_workflow` |
+| Notifications | `list_notifications`, `mark_notifications_read` |
+| PR Checks   | `list_pr_checks`, `request_pr_reviewers` |
+| Comments    | `list_issue_comments`, `get_comment`, `update_comment`, `delete_comment` |
+| Search      | `search_repos`, `search_code`, `search_users` |
+| Gists       | `list_gists`, `create_gist` |
+| Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami`, `list_contributors`, `rate_limit`, `fork_repo`, `star_repo`, `unstar_repo`, `create_repo`, `compare_refs` |
+| Milestones  | `list_milestones`, `create_milestone`, `set_issue_milestone` |
+| Security      | `list_dependabot_alerts`, `list_code_scanning_alerts`, `list_secret_scanning_alerts` |
+| Deployments   | `list_deployments` |
+| Topics        | `list_repo_topics`, `add_repo_topic` |
+| Labels        | `list_labels`, `create_label`, `update_label`, `delete_label` |
+| Collaborators | `list_collaborators`, `add_collaborator` |
+| Workflow Mgmt | `cancel_workflow_run`, `rerun_workflow` |
+| Repo Mgmt     | `archive_repo`, `unarchive_repo`, `change_repo_visibility`, `list_repo_languages`, `get_repo_license` |
+| Reactions     | `add_reaction` |
+| Pins            | `pin_issue`, `unpin_issue` |
+| PR Review       | `list_pr_review_comments`, `get_pr_diff` |
+| Git History     | `list_commits`, `list_tags` |
+| Auto-merge      | `enable_auto_merge`, `disable_auto_merge` |
+| Commit Status   | `create_commit_status` |
+| Issue Events    | `list_issue_events` |
+| Environments    | `list_environments` |
+| Repo Transfer   | `transfer_repo` |
+| Webhooks        | `list_webhooks` |
+| Traffic         | `repo_traffic` |
+| Markdown        | `render_markdown` |
+| Watch/Unwatch   | `watch_repo`, `unwatch_repo` |
+| Community       | `community_profile` |
+| Branch Protect  | `get_branch_protection` |
+| Licenses        | `list_licenses` |
+| Deploy Keys     | `list_deploy_keys`, `add_deploy_key` |
+| Secrets/Vars    | `list_repo_secrets`, `list_repo_variables` |
+| Artifacts       | `list_actions_artifacts` |
+| Issue Templates | `list_issue_templates` |
+| Template Repos  | `create_repo_from_template` |
+| Merge Options   | `set_repo_merge_options` |
+| Meta            | `list_tools` |
+| Other           | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `remove_issue_assignees`, `update_pr_branch`, `remove_collaborator`, `get_workflow_logs` |
+
 ## Architecture
 
 ```
@@ -71,8 +120,8 @@ issues-manager
 │   │   ├── base.py
 │   │   ├── openai_compat.py
 │   │   └── anthropic_provider.py
-│   └── tools/           # GitHub issue tools
-│       ├── github.py    # All issue operations via gh CLI
+│   └── tools/           # GitHub issue/PR tools
+│       ├── github.py    # All operations via gh CLI
 │       └── __init__.py  # Tool registry
 └── pyproject.toml        # Package config
 ```

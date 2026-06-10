@@ -20,6 +20,14 @@ def _gh(*args: str, timeout: int = 30) -> str:
     return result.stdout
 
 
+def _gh_json(*args: str, timeout: int = 30, repo: str = "") -> list | dict:
+    args = list(args)
+    if repo:
+        args += ["--repo", repo]
+    out = _gh(*args, timeout=timeout)
+    return json.loads(out)
+
+
 def _get_repo() -> str:
     """Detect the current repo from git remote if --repo not given."""
     try:
@@ -429,3 +437,3440 @@ def search_issues(query: str, repo: str = "", limit: int = 20) -> str:
         labels_str = f" [{', '.join(l['name'] for l in r['labels'])}]" if r["labels"] else ""
         lines.append(f"- [{repo_name}] **#{r['number']}** [{r['state']}] {r['title']}{labels_str}")
     return "\n".join(lines)
+
+
+@tool(
+    name="list_pull_requests",
+    description="List GitHub pull requests with optional filters.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "closed", "merged", "all"],
+            "description": "Filter by PR state.",
+        },
+        "label": {
+            "type": "string",
+            "description": "Filter by label name.",
+        },
+        "assignee": {
+            "type": "string",
+            "description": "Filter by assignee login.",
+        },
+        "author": {
+            "type": "string",
+            "description": "Filter by author login.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_pull_requests(repo: str = "", state: str = "open", label: str = "", assignee: str = "", author: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "list", "--state", state, "--limit", str(limit),
+            "--json", "number,title,state,headRefName,baseRefName,author,labels,createdAt,url"]
+    if label:
+        args += ["--label", label]
+    if assignee:
+        args += ["--assignee", assignee]
+    if author:
+        args += ["--author", author]
+    try:
+        prs = _gh_json(*args, repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not prs:
+        return "No pull requests found."
+
+    lines = []
+    for pr in prs:
+        labels_str = f" [{', '.join(l['name'] for l in pr['labels'])}]" if pr.get("labels") else ""
+        author_str = pr.get("author", {}).get("login", "unknown") if pr.get("author") else "unknown"
+        lines.append(f"- **#{pr['number']}** [{pr['state']}] {pr['title']} ({pr['headRefName']} → {pr['baseRefName']}) by {author_str}{labels_str}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="view_pull_request",
+    description="View full details of a specific GitHub pull request, including diff summary and reviews.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def view_pull_request(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        pr = _gh_json("pr", "view", str(number), "--json",
+                       "number,title,state,body,headRefName,baseRefName,author,labels,assignees,mergedBy,createdAt,updatedAt,mergedAt,additions,deletions,files,reviews,url",
+                       repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    labels_str = ", ".join(l["name"] for l in pr["labels"]) if pr.get("labels") else "none"
+    assignees_str = ", ".join(a["login"] for a in pr["assignees"]) if pr.get("assignees") else "none"
+    author_str = pr.get("author", {}).get("login", "unknown")
+    files_count = len(pr.get("files", []))
+    reviews = pr.get("reviews", [])
+
+    lines = [
+        f"## #{pr['number']} [{pr['state']}] {pr['title']}",
+        f"**Author:** {author_str}",
+        f"**Branch:** {pr['headRefName']} → {pr['baseRefName']}",
+        f"**Labels:** {labels_str}",
+        f"**Assignees:** {assignees_str}",
+        f"**Changes:** +{pr.get('additions', 0)} / -{pr.get('deletions', 0)} across {files_count} files",
+        f"**Created:** {pr['createdAt']}",
+        f"**Updated:** {pr['updatedAt']}",
+        f"**URL:** {pr['url']}",
+        "",
+        pr.get("body", "_No description_"),
+    ]
+
+    if pr.get("mergedBy"):
+        lines.append(f"\n**Merged by:** {pr['mergedBy']['login']} at {pr.get('mergedAt', 'unknown')}")
+
+    if reviews:
+        lines.append("")
+        lines.append("### Reviews")
+        for r in reviews:
+            reviewer = r.get("author", {}).get("login", "unknown")
+            state = r.get("state", "COMMENTED")
+            body = r.get("body", "")
+            lines.append(f"**{reviewer}** ({state}): {body[:200]}" + ("..." if len(body) > 200 else ""))
+
+    return "\n".join(lines)
+
+
+@tool(
+    name="merge_pull_request",
+    description="Merge a GitHub pull request. Supports merge, squash, and rebase strategies.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number to merge.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "method": {
+            "type": "string",
+            "enum": ["merge", "squash", "rebase"],
+            "description": "Merge method (default: merge).",
+        },
+        "delete_branch": {
+            "type": "boolean",
+            "description": "Delete the head branch after merge.",
+        },
+    },
+    required=["number"],
+)
+def merge_pull_request(number: int, repo: str = "", method: str = "merge", delete_branch: bool = False) -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "merge", str(number), "--" + method]
+    if delete_branch:
+        args.append("--delete-branch")
+    try:
+        _gh(*args, repo=repo)
+        return f"Merged PR #{number} using {method} strategy"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_labels",
+    description="List all labels in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_labels(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        labels = _gh_json("label", "list", "--json", "name,color,description", repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not labels:
+        return "No labels found."
+
+    lines = []
+    for l in labels:
+        desc = f" — {l['description']}" if l.get("description") else ""
+        lines.append(f"- `{l['name']}` (color: #{l['color']}){desc}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_label",
+    description="Create a new label in a repository.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Label name.",
+        },
+        "color": {
+            "type": "string",
+            "description": "Hex color code without # (e.g. 'ff0000').",
+        },
+        "description": {
+            "type": "string",
+            "description": "Label description.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name", "color"],
+)
+def create_label(name: str, color: str, description: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["label", "create", name, "--color", color]
+    if description:
+        args += ["--description", description]
+    try:
+        _gh(*args, repo=repo)
+        return f"Created label '{name}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_milestones",
+    description="List milestones in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "closed", "all"],
+            "description": "Filter by state.",
+        },
+    },
+    required=[],
+)
+def list_milestones(repo: str = "", state: str = "open") -> str:
+    repo = repo or _get_repo()
+    try:
+        milestones = _gh_json("api", f"repos/{repo}/milestones?state={state}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not milestones:
+        return "No milestones found."
+
+    lines = []
+    for m in milestones:
+        progress = f" ({m.get('open_issues', 0)} open / {m.get('closed_issues', 0)} closed)"
+        due = f" due {m['due_on']}" if m.get("due_on") else ""
+        lines.append(f"- **{m['title']}** [{m['state']}]{due}{progress}")
+        if m.get("description"):
+            lines.append(f"  {m['description']}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_pull_request",
+    description="Create a pull request from the current branch or specified head branch.",
+    parameters={
+        "title": {
+            "type": "string",
+            "description": "PR title.",
+        },
+        "body": {
+            "type": "string",
+            "description": "PR body/description.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "head": {
+            "type": "string",
+            "description": "Head branch name (defaults to current branch).",
+        },
+        "base": {
+            "type": "string",
+            "description": "Base branch name (defaults to default branch).",
+        },
+        "draft": {
+            "type": "boolean",
+            "description": "Create as draft PR.",
+        },
+        "labels": {
+            "type": "string",
+            "description": "Comma-separated label names.",
+        },
+        "assignees": {
+            "type": "string",
+            "description": "Comma-separated GitHub usernames.",
+        },
+    },
+    required=["title"],
+)
+def create_pull_request(title: str, body: str = "", repo: str = "", head: str = "", base: str = "", draft: bool = False, labels: str = "", assignees: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "create", "--title", title]
+    if body:
+        args += ["--body", body]
+    if repo:
+        args += ["--repo", repo]
+    if head:
+        args += ["--head", head]
+    if base:
+        args += ["--base", base]
+    if draft:
+        args.append("--draft")
+    if labels:
+        for l in labels.split(","):
+            l = l.strip()
+            if l:
+                args += ["--label", l]
+    if assignees:
+        for a in assignees.split(","):
+            a = a.strip()
+            if a:
+                args += ["--assignee", a]
+    try:
+        url = _gh(*args).strip()
+        number = url.rstrip("/").split("/")[-1]
+        return f"Created PR #{number}: {url}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="add_pr_review",
+    description="Submit a review on a pull request (approve, comment, or request changes).",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "body": {
+            "type": "string",
+            "description": "Review comment body.",
+        },
+        "event": {
+            "type": "string",
+            "enum": ["APPROVE", "COMMENT", "REQUEST_CHANGES"],
+            "description": "Review event type.",
+        },
+    },
+    required=["number", "event"],
+)
+def add_pr_review(number: int, repo: str = "", body: str = "", event: str = "COMMENT") -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "review", str(number), "--request", event]
+    if body:
+        args += ["--body", body]
+    try:
+        _gh(*args, repo=repo)
+        return f"Submitted {event} review on PR #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="add_issue_assignees",
+    description="Add assignees to a GitHub issue.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "assignees": {
+            "type": "string",
+            "description": "Comma-separated GitHub usernames to assign.",
+        },
+    },
+    required=["number", "assignees"],
+)
+def add_issue_assignees(number: int, repo: str = "", assignees: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["issue", "edit", str(number)]
+    for a in assignees.split(","):
+        a = a.strip()
+        if a:
+            args += ["--add-assignee", a]
+    try:
+        _gh(*args, repo=repo)
+        return f"Added assignees to issue #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_info",
+    description="Get repository metadata, stats, and health overview.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_repo_info(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("repo", "view", "--json",
+                        "name,owner,description,url,defaultBranch,createdAt,updatedAt,pushedAt,homepageUrl,stargazerCount,forkCount,openIssueCount,openPullRequestCount,languages,topics,isFork,isArchived,licenseInfo,milestones",
+                        repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    owner = data.get("owner", {}).get("login", "?")
+    langs = ", ".join(data.get("languages", [])) if data.get("languages") else "none"
+    topics = ", ".join(data.get("topics", [])) if data.get("topics") else "none"
+    license_name = data.get("licenseInfo", {}).get("name", "none") if data.get("licenseInfo") else "none"
+    milestones = data.get("milestones", {}).get("totalCount", 0)
+
+    status = "archived" if data.get("isArchived") else ("fork" if data.get("isFork") else "active")
+
+    lines = [
+        f"# {owner}/{data['name']}",
+        f"**Description:** {data.get('description', 'No description')}",
+        f"**Status:** {status}",
+        f"**Default branch:** {data['defaultBranch']}",
+        f"**License:** {license_name}",
+        f"**Stars:** {data.get('stargazerCount', 0)}",
+        f"**Forks:** {data.get('forkCount', 0)}",
+        f"**Open issues:** {data.get('openIssueCount', 0)}",
+        f"**Open PRs:** {data.get('openPullRequestCount', 0)}",
+        f"**Milestones:** {milestones}",
+        f"**Topics:** {topics}",
+        f"**Languages:** {langs}",
+        f"**Created:** {data.get('createdAt', '?')}",
+        f"**Last push:** {data.get('pushedAt', '?')}",
+        f"**URL:** {data.get('url', '')}",
+    ]
+    return "\n".join(lines)
+
+
+@tool(
+    name="whoami",
+    description="Show the currently authenticated GitHub user.",
+    parameters={},
+    required=[],
+)
+def whoami() -> str:
+    try:
+        user = _gh_json("api", "user", timeout=10)
+        lines = [
+            f"**Logged in as:** {user.get('login', '?')}",
+            f"**Name:** {user.get('name', 'N/A')}",
+            f"**Bio:** {user.get('bio', 'N/A')}",
+            f"**Public repos:** {user.get('public_repos', 0)}",
+            f"**Public gists:** {user.get('public_gists', 0)}",
+            f"**Followers:** {user.get('followers', 0)} / **Following:** {user.get('following', 0)}",
+            f"**Profile:** {user.get('html_url', '')}",
+        ]
+        return "\n".join(lines)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_workflow_runs",
+    description="List recent GitHub Actions workflow runs with their status and conclusion.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "branch": {
+            "type": "string",
+            "description": "Filter by branch name.",
+        },
+        "status": {
+            "type": "string",
+            "enum": ["", "queued", "in_progress", "completed", "action_required", "cancelled", "failure", "neutral", "skipped", "stale", "success", "timed_out"],
+            "description": "Filter by run status or conclusion.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_workflow_runs(repo: str = "", branch: str = "", status: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("run", "list", "--limit", str(limit), repo=repo, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    runs = data.get("workflow_runs", data) if isinstance(data, dict) else data
+    if not runs:
+        return "No workflow runs found."
+
+    lines = []
+    for r in (runs if isinstance(runs, list) else []):
+        if branch and r.get("headBranch", "") != branch:
+            continue
+        if status and r.get("status", "") != status and r.get("conclusion", "") != status:
+            continue
+        name = r.get("name", r.get("workflow", {}).get("name", "?"))
+        conclusion = r.get("conclusion", r.get("status", "?"))
+        branch_name = r.get("headBranch", "?")
+        icon = {"success": "✓", "failure": "✗", "cancelled": "—", "in_progress": "►"}.get(conclusion, "•")
+        lines.append(f"- {icon} **{name}** ({branch_name}) → `{conclusion}`")
+    return "\n".join(lines) if lines else "No matching runs found."
+
+
+@tool(
+    name="list_releases",
+    description="List releases in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_releases(repo: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    try:
+        releases = _gh_json("release", "list", "--limit", str(limit),
+                            "--json", "tagName,name,isDraft,isPrerelease,createdAt,url",
+                            repo=repo)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not releases:
+        return "No releases found."
+
+    lines = []
+    for r in releases:
+        tag = r.get("tagName", "?")
+        name = r.get("name", tag)
+        badges = []
+        if r.get("isDraft"):
+            badges.append("draft")
+        if r.get("isPrerelease"):
+            badges.append("pre-release")
+        badge_str = f" [{', '.join(badges)}]" if badges else ""
+        lines.append(f"- **{name}** (`{tag}`){badge_str} — {r.get('createdAt', '?')}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_release",
+    description="Create a new release in a repository.",
+    parameters={
+        "tag": {
+            "type": "string",
+            "description": "Tag name for the release (e.g. v1.0.0).",
+        },
+        "name": {
+            "type": "string",
+            "description": "Release title.",
+        },
+        "notes": {
+            "type": "string",
+            "description": "Release notes/body.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "target": {
+            "type": "string",
+            "description": "Commit SHA or branch to target (defaults to default branch).",
+        },
+        "draft": {
+            "type": "boolean",
+            "description": "Create as a draft release.",
+        },
+        "prerelease": {
+            "type": "boolean",
+            "description": "Mark as pre-release.",
+        },
+    },
+    required=["tag"],
+)
+def create_release(tag: str, name: str = "", notes: str = "", repo: str = "", target: str = "", draft: bool = False, prerelease: bool = False) -> str:
+    repo = repo or _get_repo()
+    args = ["release", "create", tag, "--title", name or tag]
+    if notes:
+        args += ["--notes", notes]
+    if repo:
+        args += ["--repo", repo]
+    if target:
+        args += ["--target", target]
+    if draft:
+        args.append("--draft")
+    if prerelease:
+        args.append("--prerelease")
+    try:
+        url = _gh(*args).strip()
+        return f"Created release: {url}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_branch",
+    description="Delete a branch from the repository.",
+    parameters={
+        "branch": {
+            "type": "string",
+            "description": "Branch name to delete.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["branch"],
+)
+def delete_branch(branch: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["api", f"repos/{repo}/git/refs/heads/{branch}", "--method", "DELETE"]
+    try:
+        _gh(*args, timeout=15)
+        return f"Deleted branch '{branch}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_branches",
+    description="List branches in the repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_branches(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/branches?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No branches found."
+
+    lines = []
+    for b in data:
+        protection = "🔒" if b.get("protected") else "  "
+        lines.append(f"- {protection} `{b['name']}`")
+    return "\n".join(lines)
+
+
+@tool(
+    name="lock_issue",
+    description="Lock conversation on an issue or pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "reason": {
+            "type": "string",
+            "enum": ["off_topic", "too_heated", "resolved", "spam"],
+            "description": "Reason for locking.",
+        },
+    },
+    required=["number"],
+)
+def lock_issue(number: int, repo: str = "", reason: str = "resolved") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/lock", "--method", "PUT",
+            "--raw-field", f"lock_reason={reason}", timeout=15)
+        return f"Locked #{number} (reason: {reason})"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unlock_issue",
+    description="Unlock conversation on an issue or pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def unlock_issue(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/lock", "--method", "DELETE", timeout=15)
+        return f"Unlocked #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="add_reaction",
+    description="Add a reaction to an issue, PR, or comment. Uses the comment ID if specified, otherwise targets the issue/PR.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "content": {
+            "type": "string",
+            "enum": ["+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"],
+            "description": "Reaction type.",
+        },
+        "comment_id": {
+            "type": "integer",
+            "description": "Optional comment ID to react to (instead of the issue).",
+        },
+    },
+    required=["number", "content"],
+)
+def add_reaction(number: int, repo: str = "", content: str = "+1", comment_id: int = 0) -> str:
+    repo = repo or _get_repo()
+    endpoint = f"repos/{repo}/issues/comments/{comment_id}/reactions" if comment_id else f"repos/{repo}/issues/{number}/reactions"
+    emoji_map = {
+        "+1": "👍", "-1": "👎", "laugh": "😄", "confused": "😕",
+        "heart": "❤️", "hooray": "🎉", "rocket": "🚀", "eyes": "👀",
+    }
+    try:
+        _gh("api", endpoint, "--method", "POST",
+            "--raw-field", f'content="{content}"', timeout=15)
+        return f"Added {emoji_map.get(content, content)} reaction to #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_notifications",
+    description="List unread GitHub notifications for the authenticated user.",
+    parameters={
+        "all": {
+            "type": "boolean",
+            "description": "Include all notifications, not just unread.",
+        },
+        "participating": {
+            "type": "boolean",
+            "description": "Only show notifications where user is participating.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_notifications(all: bool = False, participating: bool = False, limit: int = 10) -> str:
+    args = ["api", f"notifications?per_page={limit}"]
+    if all:
+        args[0] += "&all=true"
+    if participating:
+        args[0] += "&participating=true"
+    try:
+        notifs = _gh_json(*args, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not notifs:
+        return "No notifications."
+
+    lines = []
+    for n in notifs[:limit]:
+        repo_name = n.get("repository", {}).get("full_name", "?")
+        subject = n.get("subject", {})
+        title = subject.get("title", "?")
+        ntype = subject.get("type", "?")
+        reason = n.get("reason", "?")
+        url = subject.get("url", "")
+        lines.append(f"- [{repo_name}] **{ntype}** — {title} ({reason})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="mark_notifications_read",
+    description="Mark all notifications as read, or mark a specific thread by ID.",
+    parameters={
+        "thread_id": {
+            "type": "string",
+            "description": "Specific notification thread ID to mark as read. Omit to mark all.",
+        },
+        "last_read_at": {
+            "type": "string",
+            "description": "ISO 8601 timestamp to mark everything before as read.",
+        },
+    },
+    required=[],
+)
+def mark_notifications_read(thread_id: str = "", last_read_at: str = "") -> str:
+    try:
+        if thread_id:
+            _gh("api", f"notifications/threads/{thread_id}/read", "--method", "PATCH", "--silent", timeout=15)
+            return f"Marked notification {thread_id} as read"
+        else:
+            args = ["api", "notifications", "--method", "PUT"]
+            if last_read_at:
+                args += ["--raw-field", f'last_read_at={last_read_at}']
+            _gh(*args, timeout=15)
+            return "Marked all notifications as read"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_contributors",
+    description="List contributors to a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_contributors(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/contributors?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No contributors found."
+
+    lines = []
+    for c in data:
+        lines.append(f"- **{c['login']}** — {c.get('contributions', 0)} commits")
+    return "\n".join(lines)
+
+
+@tool(
+    name="rate_limit",
+    description="Check GitHub API rate limit status for the authenticated user.",
+    parameters={},
+    required=[],
+)
+def rate_limit() -> str:
+    try:
+        data = _gh_json("api", "rate_limit", timeout=10)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    core = data.get("resources", {}).get("core", {})
+    search = data.get("resources", {}).get("search", {})
+    graphql = data.get("resources", {}).get("graphql", {})
+
+    lines = [
+        "## API Rate Limits",
+        f"**Core:** {core.get('remaining', '?')}/{core.get('limit', '?')} remaining (resets {core.get('reset', '?')})",
+        f"**Search:** {search.get('remaining', '?')}/{search.get('limit', '?')} remaining",
+        f"**GraphQL:** {graphql.get('remaining', '?')}/{graphql.get('limit', '?')} remaining",
+    ]
+    return "\n".join(lines)
+
+
+@tool(
+    name="transfer_issue",
+    description="Transfer an issue to another repository.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue number to transfer.",
+        },
+        "destination": {
+            "type": "string",
+            "description": "Destination repository in owner/repo format.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Current repository. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "destination"],
+)
+def transfer_issue(number: int, destination: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/transfer", "--method", "POST",
+            "--raw-field", f'{{"new_owner":"{destination.split("/")[0]}","new_name":"{destination.split("/")[1]}"}}',
+            timeout=15)
+        return f"Transferred #{number} to {destination}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_pr_checks",
+    description="List all check runs / CI status for a pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def list_pr_checks(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        pr = _gh_json("pr", "view", str(number), "--json", "headRefName", repo=repo)
+        branch = pr.get("headRefName", "")
+        if not branch:
+            return "Could not determine PR branch."
+        # Use the check-runs API via the branch's commit status
+        data = _gh_json("api", f"repos/{repo}/commits/{branch}/check-runs?per_page=20", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    runs = data.get("check_runs", [])
+    if not runs:
+        return "No check runs found for this PR."
+
+    lines = []
+    for r in runs:
+        name = r.get("name", "?")
+        conclusion = r.get("conclusion", r.get("status", "pending"))
+        status = r.get("status", "?")
+        icon_map = {
+            "success": "✓", "failure": "✗", "cancelled": "—",
+            "neutral": "•", "skipped": "…", "timed_out": "⏱",
+            "in_progress": "►", "queued": "○", "pending": "○",
+        }
+        icon = icon_map.get(conclusion, icon_map.get(status, "?"))
+        lines.append(f"- {icon} **{name}** → `{conclusion}` ({status})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="request_pr_reviewers",
+    description="Request reviews from specific users on a pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "reviewers": {
+            "type": "string",
+            "description": "Comma-separated GitHub usernames to request review from.",
+        },
+        "team_reviewers": {
+            "type": "string",
+            "description": "Comma-separated team names (slug) to request review from.",
+        },
+    },
+    required=["number", "reviewers"],
+)
+def request_pr_reviewers(number: int, repo: str = "", reviewers: str = "", team_reviewers: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["pr", "review", str(number), "--request"]
+    for r in reviewers.split(","):
+        r = r.strip()
+        if r:
+            args += ["--reviewer", r]
+    for t in team_reviewers.split(","):
+        t = t.strip()
+        if t:
+            args += ["--team", t]
+    try:
+        _gh(*args, repo=repo)
+        return f"Requested reviews on PR #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_milestone",
+    description="Create a milestone in a repository.",
+    parameters={
+        "title": {
+            "type": "string",
+            "description": "Milestone title.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "description": {
+            "type": "string",
+            "description": "Milestone description.",
+        },
+        "due_date": {
+            "type": "string",
+            "description": "Due date in YYYY-MM-DD format.",
+        },
+    },
+    required=["title"],
+)
+def create_milestone(title: str, repo: str = "", description: str = "", due_date: str = "") -> str:
+    repo = repo or _get_repo()
+    import urllib.parse
+    args = ["api", f"repos/{repo}/milestones", "--method", "POST",
+            "--raw-field", f'title={urllib.parse.quote(title)}']
+    if description:
+        args += ["--raw-field", f"description={urllib.parse.quote(description)}"]
+    if due_date:
+        args += ["--raw-field", f"due_on={urllib.parse.quote(due_date)}T23:59:59Z"]
+    try:
+        _gh(*args, timeout=15)
+        return f"Created milestone '{title}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_comment",
+    description="Edit an existing comment on an issue or pull request.",
+    parameters={
+        "comment_id": {
+            "type": "integer",
+            "description": "Comment ID to edit.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "body": {
+            "type": "string",
+            "description": "New comment body text.",
+        },
+    },
+    required=["comment_id", "body"],
+)
+def update_comment(comment_id: int, body: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/comments/{comment_id}", "--method", "PATCH",
+            "--raw-field", f'body={body}', timeout=15)
+        return f"Updated comment {comment_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_comment",
+    description="Delete a comment on an issue or pull request.",
+    parameters={
+        "comment_id": {
+            "type": "integer",
+            "description": "Comment ID to delete.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["comment_id"],
+)
+def delete_comment(comment_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/comments/{comment_id}", "--method", "DELETE", timeout=15)
+        return f"Deleted comment {comment_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="search_repos",
+    description="Search GitHub repositories by query.",
+    parameters={
+        "query": {
+            "type": "string",
+            "description": "Search query (supports qualifiers like language:python, stars:>100, topic:hacktoberfest).",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["query"],
+)
+def search_repos(query: str, limit: int = 10) -> str:
+    try:
+        data = _gh_json("search", "repos", query, "--limit", str(limit),
+                        "--json", "name,owner,description,stargazerCount,forkCount,language,url", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No repositories found."
+
+    lines = []
+    for r in data:
+        owner = r.get("owner", {}).get("login", "?")
+        lang = r.get("language", "") or ""
+        lang_str = f" ({lang})" if lang else ""
+        desc = r.get("description", "") or ""
+        desc_short = f" — {desc[:80]}{'...' if len(desc) > 80 else ''}" if desc else ""
+        lines.append(f"- **{owner}/{r['name']}** ⭐{r.get('stargazerCount', 0)}🍴{r.get('forkCount', 0)}{lang_str}{desc_short}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="search_code",
+    description="Search code within a repository using GitHub's code search.",
+    parameters={
+        "query": {
+            "type": "string",
+            "description": "Search query.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Limit to a specific repository (owner/repo).",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["query"],
+)
+def search_code(query: str, repo: str = "", limit: int = 10) -> str:
+    full_query = f"repo:{repo} {query}" if repo else query
+    try:
+        data = _gh_json("search", "code", full_query, "--limit", str(limit),
+                        "--json", "path,repository,name,url", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No code matches found."
+
+    lines = []
+    for r in data:
+        repo_name = r.get("repository", {}).get("fullName", "?")
+        path = r.get("path", "?")
+        lines.append(f"- [{repo_name}] `{path}`")
+    return "\n".join(lines)
+
+
+@tool(
+    name="fork_repo",
+    description="Fork a repository to your account or an organization.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository to fork in owner/repo format.",
+        },
+        "organization": {
+            "type": "string",
+            "description": "Organization to fork to (defaults to personal account).",
+        },
+    },
+    required=["repo"],
+)
+def fork_repo(repo: str = "", organization: str = "") -> str:
+    args = ["api", f"repos/{repo}/forks", "--method", "POST"]
+    if organization:
+        args += ["--raw-field", f'organization={organization}']
+    try:
+        data = _gh_json(*args, timeout=30)
+        full_name = data.get("full_name", data.get("name", "?"))
+        return f"Forked {repo} → {full_name}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="star_repo",
+    description="Star a repository for the authenticated user.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format.",
+        },
+    },
+    required=["repo"],
+)
+def star_repo(repo: str) -> str:
+    try:
+        _gh("api", f"user/starred/{repo}", "--method", "PUT", "--silent", timeout=15)
+        return f"Starred {repo} ⭐"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unstar_repo",
+    description="Unstar a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format.",
+        },
+    },
+    required=["repo"],
+)
+def unstar_repo(repo: str) -> str:
+    try:
+        _gh("api", f"user/starred/{repo}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Unstarred {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_issue_comments",
+    description="List all comments on an issue or pull request with author and timestamp.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=["number"],
+)
+def list_issue_comments(number: int, repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/issues/{number}/comments?per_page={limit}&sort=created&direction=asc", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No comments on this issue."
+
+    lines = []
+    for c in data:
+        author = c.get("user", {}).get("login", "?")
+        created = c.get("created_at", "?")
+        body = (c.get("body", "") or "")[:120].replace("\n", " ")
+        lines.append(f"- **{author}** ({created}): {body}{'...' if len(c.get('body','') or '') > 120 else ''}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_comment",
+    description="Get a specific comment by its ID.",
+    parameters={
+        "comment_id": {
+            "type": "integer",
+            "description": "Comment ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["comment_id"],
+)
+def get_comment(comment_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        c = _gh_json("api", f"repos/{repo}/issues/comments/{comment_id}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    author = c.get("user", {}).get("login", "?")
+    created = c.get("created_at", "?")
+    updated = c.get("updated_at", "")
+    body = c.get("body", "_No content_")
+    return f"**Comment {comment_id}** by {author}\n**Created:** {created}\n**Updated:** {updated}\n\n{body}"
+
+
+@tool(
+    name="set_issue_milestone",
+    description="Assign an issue or PR to a milestone.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "milestone": {
+            "type": "string",
+            "description": "Milestone title or number (number is more reliable).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "milestone"],
+)
+def set_issue_milestone(number: int, milestone: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    # If milestone is a title, look up its number
+    milestone_num = milestone
+    if not milestone.isdigit():
+        try:
+            ms = _gh_json("api", f"repos/{repo}/milestones?state=all&per_page=100", timeout=15)
+            for m in ms:
+                if m["title"].lower() == milestone.lower():
+                    milestone_num = str(m["number"])
+                    break
+            else:
+                return f"Error: milestone '{milestone}' not found. Use list_milestones to see available ones."
+        except RuntimeError as e:
+            return f"Error: {e}"
+
+    try:
+        _gh("issue", "edit", str(number), "--milestone", milestone_num, "--repo", repo)
+        return f"Set milestone to '{milestone}' on #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_repo",
+    description="Create a new repository on GitHub.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Repository name.",
+        },
+        "description": {
+            "type": "string",
+            "description": "Repository description.",
+        },
+        "private": {
+            "type": "boolean",
+            "description": "Create as private repository.",
+        },
+        "init": {
+            "type": "boolean",
+            "description": "Initialize with README.",
+        },
+        "license": {
+            "type": "string",
+            "description": "License template (e.g. mit, apache-2.0, gpl-3.0).",
+        },
+        "gitignore": {
+            "type": "string",
+            "description": "Gitignore template (e.g. Python, Node, Rust).",
+        },
+    },
+    required=["name"],
+)
+def create_repo(name: str, description: str = "", private: bool = False, init: bool = False, license: str = "", gitignore: str = "") -> str:
+    args = ["repo", "create", name]
+    if private:
+        args.append("--private")
+    else:
+        args.append("--public")
+    if description:
+        args += ["--description", description]
+    if init:
+        args.append("--add-readme")
+    if license:
+        args += ["--license", license]
+    if gitignore:
+        args += ["--gitignore", gitignore]
+    try:
+        url = _gh(*args, timeout=30).strip()
+        return f"Created repository: {url}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_gist",
+    description="Create a new gist with the given files.",
+    parameters={
+        "description": {
+            "type": "string",
+            "description": "Gist description.",
+        },
+        "public": {
+            "type": "boolean",
+            "description": "Create as public gist.",
+        },
+        "files": {
+            "type": "string",
+            "description": "JSON string mapping filename to content, e.g. '{\"hello.py\": \"print(\\\"hi\\\")\"}'",
+        },
+    },
+    required=["files"],
+)
+def create_gist(description: str = "", public: bool = False, files: str = "{}") -> str:
+    import json as j
+    try:
+        file_data = j.loads(files)
+    except j.JSONDecodeError:
+        return "Error: files must be a valid JSON object mapping filenames to content"
+    args = ["gist", "create"]
+    if description:
+        args += ["--desc", description]
+    if public:
+        args.append("--public")
+    else:
+        args.append("--private")
+    try:
+        url = _gh(*args, *file_data.keys(), timeout=30).strip()
+        return f"Created gist: {url}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_gists",
+    description="List gists for the authenticated user.",
+    parameters={
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+        "public": {
+            "type": "boolean",
+            "description": "Only show public gists.",
+        },
+    },
+    required=[],
+)
+def list_gists(limit: int = 10, public: bool = False) -> str:
+    args = ["gist", "list", "--limit", str(limit)]
+    if public:
+        args.append("--public")
+    try:
+        data = _gh_json(*args, timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No gists found."
+
+    lines = []
+    for g in data:
+        vis = "public" if g.get("isPublic") else "secret"
+        files = ", ".join(g.get("files", {}).keys()) if isinstance(g.get("files"), dict) else ", ".join(f.get("name","?") for f in (g.get("files") or []))
+        lines.append(f"- `{g.get('name', g.get('id','?'))}` [{vis}] — {files}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="compare_refs",
+    description="Compare two git references (branches, tags, commits) in a repository.",
+    parameters={
+        "base": {
+            "type": "string",
+            "description": "Base ref (e.g. main, v1.0).",
+        },
+        "head": {
+            "type": "string",
+            "description": "Head ref to compare against base.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["base", "head"],
+)
+def compare_refs(base: str, head: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/compare/{base}...{head}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    ahead = data.get("ahead_by", 0)
+    behind = data.get("behind_by", 0)
+    files = data.get("files", [])
+    total_changes = sum(f.get("changes", 0) for f in files)
+    additions = sum(f.get("additions", 0) for f in files)
+    deletions = sum(f.get("deletions", 0) for f in files)
+    commits = data.get("total_commits", 0)
+    status = data.get("status", "?")
+
+    lines = [
+        f"**{base}...{head}** — {status}",
+        f"**Commits:** {commits} | **Files:** {len(files)} | **Changes:** +{additions}/-{deletions} ({total_changes} total)",
+        f"**Ahead by:** {ahead} | **Behind by:** {behind}",
+        "",
+    ]
+    for f in files[:30]:
+        status_icon = {"added": "+", "removed": "-", "modified": "~", "renamed": "→"}.get(f.get("status", ""), " ")
+        lines.append(f"  {status_icon} `{f['filename']}` (+{f.get('additions',0)}/-{f.get('deletions',0)})")
+    if len(files) > 30:
+        lines.append(f"  ... and {len(files) - 30} more files")
+    return "\n".join(lines)
+
+
+@tool(
+    name="trigger_workflow",
+    description="Trigger (dispatch) a GitHub Actions workflow by filename. Optionally pass inputs and target branch.",
+    parameters={
+        "workflow": {
+            "type": "string",
+            "description": "Workflow filename (e.g. 'ci.yml') or ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "ref": {
+            "type": "string",
+            "description": "Branch to run the workflow on (defaults to default branch).",
+        },
+        "inputs": {
+            "type": "string",
+            "description": "JSON string of workflow inputs, e.g. '{\"name\":\"value\"}'",
+        },
+    },
+    required=["workflow"],
+)
+def trigger_workflow(workflow: str, repo: str = "", ref: str = "", inputs: str = "{}") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    try:
+        input_data = j.loads(inputs) if inputs and inputs != "{}" else None
+    except j.JSONDecodeError:
+        return "Error: inputs must be valid JSON"
+    # Resolve workflow filename to ID if needed
+    wf_id = workflow
+    if not workflow.isdigit():
+        try:
+            wfs = _gh_json("api", f"repos/{repo}/actions/workflows?per_page=100", timeout=15)
+            for w in wfs.get("workflows", []):
+                if w["name"] == workflow or w["path"].endswith("/" + workflow):
+                    wf_id = str(w["id"])
+                    break
+            else:
+                return f"Error: workflow '{workflow}' not found. Use list_workflows to see available ones."
+        except RuntimeError as e:
+            return f"Error: {e}"
+    args = ["api", f"repos/{repo}/actions/workflows/{wf_id}/dispatches", "--method", "POST",
+            "--raw-field", f'ref={ref or "main"}']
+    if input_data:
+        args[-1] += f',"inputs":{j.dumps(input_data)}'
+    try:
+        _gh(*args, timeout=15)
+        return f"Triggered workflow '{workflow}' on {ref or 'default branch'}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_workflows",
+    description="List all GitHub Actions workflow files in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_workflows(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/workflows?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    workflows = data.get("workflows", [])
+    if not workflows:
+        return "No workflows found."
+
+    lines = []
+    for w in workflows:
+        state = w.get("state", "?")
+        badge = "✓" if state == "active" else ("✗" if state == "disabled" else "•")
+        lines.append(f"- {badge} **{w['name']}** — `{w['path']}` [{state}]")
+    return "\n".join(lines)
+
+
+@tool(
+    name="update_pr_branch",
+    description="Update a pull request branch with the latest changes from the base branch.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def update_pr_branch(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/pulls/{number}/update-branch", "--method", "PUT", "--silent", timeout=30)
+        return f"Updated PR #{number} branch with latest base"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="search_users",
+    description="Search GitHub users by query.",
+    parameters={
+        "query": {
+            "type": "string",
+            "description": "Search query (supports qualifiers like type:org, repos:>10, followers:>100).",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=["query"],
+)
+def search_users(query: str, limit: int = 10) -> str:
+    try:
+        data = _gh_json("search", "users", query, "--limit", str(limit),
+                        "--json", "login,name,url", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No users found."
+
+    lines = []
+    for u in data:
+        name = u.get("name", "") or ""
+        name_str = f" ({name})" if name else ""
+        lines.append(f"- **{u['login']}**{name_str}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="remove_issue_labels",
+    description="Remove specific labels from an issue or pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "labels": {
+            "type": "string",
+            "description": "Comma-separated label names to remove.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "labels"],
+)
+def remove_issue_labels(number: int, labels: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["issue", "edit", str(number), "--repo", repo]
+    for l in labels.split(","):
+        l = l.strip()
+        if l:
+            args += ["--remove-label", l]
+    try:
+        _gh(*args)
+        return f"Removed labels from #{number}: {labels}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_repo_topics",
+    description="List all topics on a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_repo_topics(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/topics", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    topics = data.get("names", [])
+    if not topics:
+        return "No topics."
+    return "Topics: " + ", ".join(f"`{t}`" for t in topics)
+
+
+@tool(
+    name="add_repo_topic",
+    description="Add topics to a repository (replaces all existing topics — include all current ones to preserve them).",
+    parameters={
+        "topics": {
+            "type": "string",
+            "description": "Comma-separated topic names.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["topics"],
+)
+def add_repo_topic(topics: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    topic_list = [t.strip() for t in topics.split(",") if t.strip()]
+    try:
+        _gh("api", f"repos/{repo}/topics", "--method", "PUT",
+            "--raw-field", f'names={j.dumps(topic_list)}', timeout=15)
+        return f"Set topics: {', '.join(topic_list)}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_dependabot_alerts",
+    description="List Dependabot security alerts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "dismissed", "fixed"],
+            "description": "Filter by alert state.",
+        },
+        "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Filter by severity.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_dependabot_alerts(repo: str = "", state: str = "", severity: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    query = f"state={state}&" if state else ""
+    if severity:
+        query += f"severity={severity}&"
+    query += f"per_page={limit}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/dependabot/alerts?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No Dependabot alerts found."
+
+    lines = []
+    for a in data:
+        pkg = a.get("security_advisory", {}).get("package", {}).get("name", "?") if a.get("security_advisory") else (a.get("security_vulnerability", {}).get("package", {}).get("name", "?") if a.get("security_vulnerability") else "?")
+        sev = a.get("security_advisory", {}).get("severity", "?") if a.get("security_advisory") else "?"
+        state_str = a.get("state", "?")
+        lines.append(f"- **{pkg}** [{sev}] ({state_str}) — {a.get('html_url', '')}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="set_issue_priority",
+    description="Set priority on an issue by adding a priority label. Creates the label if it doesn't exist.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "priority": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Priority level.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "priority"],
+)
+def set_issue_priority(number: int, priority: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    label_name = f"priority:{priority}"
+    color_map = {"critical": "b60205", "high": "d93f0b", "medium": "fbca04", "low": "0e8a16"}
+    # Try to create label if it doesn't exist (silently ignore if already exists)
+    try:
+        _gh("label", "create", label_name, "--color", color_map.get(priority, "cccccc"),
+            "--repo", repo, "--silent")
+    except RuntimeError:
+        pass
+    try:
+        _gh("issue", "edit", str(number), "--add-label", label_name, "--repo", repo)
+        return f"Set priority:{priority} on #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_deployments",
+    description="List deployments for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "environment": {
+            "type": "string",
+            "description": "Filter by environment name (e.g. production, staging).",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_deployments(repo: str = "", environment: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    query = f"per_page={limit}"
+    if environment:
+        query += f"&environment={environment}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/deployments?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No deployments found."
+
+    lines = []
+    for d in data:
+        env = d.get("environment", "?")
+        creator = d.get("creator", {}).get("login", "?")
+        created = d.get("created_at", "?")
+        ref = d.get("ref", "?")
+        status = "active" if d.get("statuses_url") else "?"
+        lines.append(f"- `{ref}` → **{env}** by {creator} ({created}) [{status}]")
+    return "\n".join(lines)
+
+
+@tool(
+    name="archive_repo",
+    description="Archive a repository (makes it read-only).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def archive_repo(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}", "--method", "PATCH",
+            "--raw-field", 'archived=true', timeout=15)
+        return f"Archived {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unarchive_repo",
+    description="Unarchive a previously archived repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def unarchive_repo(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}", "--method", "PATCH",
+            "--raw-field", 'archived=false', timeout=15)
+        return f"Unarchived {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="change_repo_visibility",
+    description="Change repository visibility (public/private/internal).",
+    parameters={
+        "visibility": {
+            "type": "string",
+            "enum": ["public", "private", "internal"],
+            "description": "New visibility setting.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["visibility"],
+)
+def change_repo_visibility(visibility: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("repo", "edit", repo, f"--{visibility}")
+        return f"Changed {repo} visibility to {visibility}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="pin_issue",
+    description="Pin an issue or pull request to the repository overview page.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number to pin.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def pin_issue(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/pin", "--method", "POST", "--silent", timeout=15)
+        return f"Pinned #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unpin_issue",
+    description="Unpin an issue or pull request from the repository overview.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number to unpin.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def unpin_issue(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/pin", "--method", "DELETE", "--silent", timeout=15)
+        return f"Unpinned #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_label",
+    description="Update a label's name, color, or description.",
+    parameters={
+        "current_name": {
+            "type": "string",
+            "description": "Current label name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "new_name": {
+            "type": "string",
+            "description": "New label name (if renaming).",
+        },
+        "color": {
+            "type": "string",
+            "description": "New hex color code without # (e.g. 'ff0000').",
+        },
+        "description": {
+            "type": "string",
+            "description": "New description.",
+        },
+    },
+    required=["current_name"],
+)
+def update_label(current_name: str, repo: str = "", new_name: str = "", color: str = "", description: str = "") -> str:
+    repo = repo or _get_repo()
+    import urllib.parse
+    encoded_name = urllib.parse.quote(current_name, safe='')
+    args = ["api", f"repos/{repo}/labels/{encoded_name}", "--method", "PATCH"]
+    if new_name:
+        args += ["--raw-field", f'new_name={new_name}']
+    if color:
+        args += ["--raw-field", f'color={color}']
+    if description:
+        args += ["--raw-field", f'description={description}']
+    try:
+        _gh(*args, timeout=15)
+        return f"Updated label '{current_name}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_label",
+    description="Delete a label from a repository.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Label name to delete.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name"],
+)
+def delete_label(name: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import urllib.parse
+    encoded_name = urllib.parse.quote(name, safe='')
+    try:
+        _gh("api", f"repos/{repo}/labels/{encoded_name}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Deleted label '{name}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_collaborators",
+    description="List collaborators (users with access) on a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "role": {
+            "type": "string",
+            "enum": ["admin", "maintain", "push", "triage", "pull"],
+            "description": "Filter by role.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_collaborators(repo: str = "", role: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    query = f"per_page={limit}"
+    if role:
+        query += f"&role={role}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/collaborators?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No collaborators found."
+
+    lines = []
+    for c in data:
+        perms = c.get("role_name", c.get("permissions", {}).get("admin", ""))
+        lines.append(f"- **{c['login']}** — {perms}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="add_collaborator",
+    description="Add a collaborator to a repository with a specific permission level.",
+    parameters={
+        "username": {
+            "type": "string",
+            "description": "GitHub username to add.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "permission": {
+            "type": "string",
+            "enum": ["pull", "push", "admin", "maintain", "triage"],
+            "description": "Permission level (default: push).",
+        },
+    },
+    required=["username"],
+)
+def add_collaborator(username: str, repo: str = "", permission: str = "push") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/collaborators/{username}", "--method", "PUT",
+            "--raw-field", f'permission={permission}', "--silent", timeout=15)
+        return f"Added {username} as {permission} to {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="cancel_workflow_run",
+    description="Cancel a running GitHub Actions workflow run.",
+    parameters={
+        "run_id": {
+            "type": "integer",
+            "description": "Workflow run ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["run_id"],
+)
+def cancel_workflow_run(run_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/actions/runs/{run_id}/cancel", "--method", "POST", "--silent", timeout=15)
+        return f"Cancelled workflow run {run_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="rerun_workflow",
+    description="Rerun a failed or cancelled workflow run.",
+    parameters={
+        "run_id": {
+            "type": "integer",
+            "description": "Workflow run ID to rerun.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "failed_jobs": {
+            "type": "boolean",
+            "description": "Only rerun failed jobs.",
+        },
+    },
+    required=["run_id"],
+)
+def rerun_workflow(run_id: int, repo: str = "", failed_jobs: bool = False) -> str:
+    repo = repo or _get_repo()
+    endpoint = f"repos/{repo}/actions/runs/{run_id}/rerun-failed-jobs" if failed_jobs else f"repos/{repo}/actions/runs/{run_id}/rerun"
+    try:
+        _gh("api", endpoint, "--method", "POST", "--silent", timeout=15)
+        return f"Reran workflow run {run_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_license",
+    description="Get the license content for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_repo_license(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/license", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    license_name = data.get("license", {}).get("name", "Unknown") if data.get("license") else "Unknown"
+    key = data.get("license", {}).get("key", "?") if data.get("license") else "?"
+    content = data.get("content", "")
+    import base64
+    try:
+        decoded = base64.b64decode(content).decode("utf-8") if content else "No content"
+    except Exception:
+        decoded = "Could not decode license content"
+    return f"## License: {license_name} ({key})\n\n```\n{decoded[:2000]}{'...' if len(decoded) > 2000 else ''}\n```"
+
+
+@tool(
+    name="list_repo_languages",
+    description="Get the programming language breakdown by bytes for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_repo_languages(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/languages", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No language data available."
+
+    total = sum(data.values())
+    sorted_langs = sorted(data.items(), key=lambda x: x[1], reverse=True)
+    lines = []
+    for lang, bytes_count in sorted_langs:
+        pct = (bytes_count / total) * 100 if total > 0 else 0
+        bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
+        lines.append(f"- {bar} **{lang}** {pct:.1f}% ({bytes_count:,} bytes)")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_environments",
+    description="List deployment environments for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_environments(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/environments?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    envs = data.get("environments", [])
+    if not envs:
+        return "No environments found."
+
+    lines = []
+    for e in envs:
+        protection = "🔒" if e.get("protection_rules") else "  "
+        lines.append(f"- {protection} **{e['name']}**")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_pr_diff",
+    description="Get the diff content of a pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "max_lines": {
+            "type": "integer",
+            "description": "Max lines of diff to show (default 100).",
+        },
+    },
+    required=["number"],
+)
+def get_pr_diff(number: int, repo: str = "", max_lines: int = 100) -> str:
+    repo = repo or _get_repo()
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "diff", str(number), "--repo", repo],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            return f"Error: {result.stderr.strip()}"
+        diff = result.stdout
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    lines = diff.split("\n")
+    total = len(lines)
+    shown = "\n".join(lines[:max_lines])
+    if total > max_lines:
+        shown += f"\n\n... truncated, {total - max_lines} more lines"
+    return shown
+
+
+@tool(
+    name="list_pr_review_comments",
+    description="List inline review comments on a pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=["number"],
+)
+def list_pr_review_comments(number: int, repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/pulls/{number}/comments?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No review comments found."
+
+    lines = []
+    for c in data:
+        author = c.get("user", {}).get("login", "?")
+        path = c.get("path", "?")
+        line = c.get("line", c.get("original_line", "?"))
+        body = (c.get("body", "") or "")[:100].replace("\n", " ")
+        lines.append(f"- **{author}** on `{path}:{line}`: {body}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_commits",
+    description="List commits on a branch with author, SHA, and message.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "branch": {
+            "type": "string",
+            "description": "Branch name (defaults to default branch).",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_commits(repo: str = "", branch: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    sha = branch or ""
+    try:
+        data = _gh_json("api", f"repos/{repo}/commits?sha={sha}&per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No commits found."
+
+    lines = []
+    for c in data:
+        short_sha = c["sha"][:7]
+        author = c.get("commit", {}).get("author", {}).get("name", "?")
+        msg = (c.get("commit", {}).get("message", "") or "").split("\n")[0]
+        lines.append(f"- `{short_sha}` **{author}** — {msg}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_tags",
+    description="List tags in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_tags(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/tags?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No tags found."
+
+    lines = []
+    for t in data:
+        sha = t.get("commit", {}).get("sha", "?")[:7] if t.get("commit") else "?"
+        lines.append(f"- `{t['name']}` ({sha})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_commit_status",
+    description="Set a commit status (e.g. pending, success, failure, error) on a specific commit SHA.",
+    parameters={
+        "sha": {
+            "type": "string",
+            "description": "Full commit SHA.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["pending", "success", "failure", "error"],
+            "description": "Status state.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "description": {
+            "type": "string",
+            "description": "Short description of the status.",
+        },
+        "context": {
+            "type": "string",
+            "description": "Context label (e.g. 'ci/github-issues-manager').",
+        },
+        "target_url": {
+            "type": "string",
+            "description": "Target URL for the status details.",
+        },
+    },
+    required=["sha", "state"],
+)
+def create_commit_status(sha: str, state: str, repo: str = "", description: str = "", context: str = "", target_url: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = {"state": state, "description": description, "context": context or "github-issues-manager"}
+    if target_url:
+        payload["target_url"] = target_url
+    try:
+        _gh("api", f"repos/{repo}/statuses/{sha}", "--method", "POST",
+            "--raw-field", j.dumps(payload), timeout=15)
+        return f"Set commit status to {state} on {sha[:7]}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="enable_auto_merge",
+    description="Enable auto-merge on a pull request with a specific merge method.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "method": {
+            "type": "string",
+            "enum": ["merge", "squash", "rebase"],
+            "description": "Merge method (default: merge).",
+        },
+    },
+    required=["number"],
+)
+def enable_auto_merge(number: int, repo: str = "", method: str = "merge") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("pr", "merge", str(number), "--auto", f"--{method}", "--repo", repo)
+        return f"Enabled auto-merge on PR #{number} ({method})"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="disable_auto_merge",
+    description="Disable auto-merge on a pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def disable_auto_merge(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("pr", "merge", str(number), "--disable-auto", "--repo", repo)
+        return f"Disabled auto-merge on PR #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="transfer_repo",
+    description="Transfer a repository to another user or organization.",
+    parameters={
+        "new_owner": {
+            "type": "string",
+            "description": "New owner (username or organization name).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["new_owner"],
+)
+def transfer_repo(new_owner: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    try:
+        _gh("api", f"repos/{repo}/transfer", "--method", "POST",
+            "--raw-field", j.dumps({"new_owner": new_owner}), timeout=30)
+        return f"Transferred {repo} to {new_owner}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_issue_events",
+    description="List timeline events for an issue (labeled, unlabeled, assigned, closed, referenced, etc.).",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=["number"],
+)
+def list_issue_events(number: int, repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/issues/{number}/events?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No events found."
+
+    lines = []
+    for e in data:
+        actor = e.get("actor", {}).get("login", "?")
+        event = e.get("event", "?")
+        created = e.get("created_at", "?")
+        extra = ""
+        if event == "labeled":
+            extra = f" → {e.get('label', {}).get('name', '?')}"
+        elif event == "assigned":
+            extra = f" → {e.get('assignee', {}).get('login', '?')}"
+        elif event == "milestoned":
+            extra = f" → {e.get('milestone', {}).get('title', '?')}"
+        lines.append(f"- **{actor}** {event}{extra} ({created})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="remove_collaborator",
+    description="Remove a collaborator from a repository.",
+    parameters={
+        "username": {
+            "type": "string",
+            "description": "GitHub username to remove.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["username"],
+)
+def remove_collaborator(username: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/collaborators/{username}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Removed {username} from {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_code_scanning_alerts",
+    description="List Code Scanning security alerts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "dismissed", "fixed"],
+            "description": "Filter by state.",
+        },
+        "severity": {
+            "type": "string",
+            "enum": ["error", "warning", "note"],
+            "description": "Filter by severity.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_code_scanning_alerts(repo: str = "", state: str = "", severity: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    query = f"per_page={limit}"
+    if state:
+        query += f"&state={state}"
+    if severity:
+        query += f"&severity={severity}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/code-scanning/alerts?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No code scanning alerts found."
+
+    lines = []
+    for a in data:
+        rule = a.get("rule", {}).get("name", a.get("rule", {}).get("id", "?"))
+        sev = a.get("rule", {}).get("security_severity_level", a.get("rule", {}).get("severity", "?"))
+        state_str = a.get("state", "?")
+        lines.append(f"- **{rule}** [{sev}] ({state_str}) — {a.get('html_url', '')}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_secret_scanning_alerts",
+    description="List Secret Scanning alerts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "state": {
+            "type": "string",
+            "enum": ["open", "resolved"],
+            "description": "Filter by state.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_secret_scanning_alerts(repo: str = "", state: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    query = f"per_page={limit}"
+    if state:
+        query += f"&state={state}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/secret-scanning/alerts?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No secret scanning alerts found."
+
+    lines = []
+    for a in data:
+        secret_type = a.get("secret_type_display_name", a.get("secret_type", "?"))
+        state_str = a.get("state", "?")
+        created = a.get("created_at", "?")
+        lines.append(f"- **{secret_type}** [{state_str}] — detected {created}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_webhooks",
+    description="List webhooks configured on a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_webhooks(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/hooks?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No webhooks found."
+
+    lines = []
+    for h in data:
+        url = h.get("config", {}).get("url", "?")
+        events = ", ".join(h.get("events", []))
+        active = "✓" if h.get("active") else "✗"
+        lines.append(f"- {active} **{h['name']}** → `{url}` [{events}]")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_branch_protection",
+    description="Get branch protection rules for a branch.",
+    parameters={
+        "branch": {
+            "type": "string",
+            "description": "Branch name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["branch"],
+)
+def get_branch_protection(branch: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/branches/{branch}/protection", timeout=15)
+    except RuntimeError:
+        return "No branch protection rules found (or branch doesn't exist)."
+
+    lines = [f"## Branch protection: `{branch}`"]
+    checks = []
+
+    if data.get("required_status_checks"):
+        contexts = data["required_status_checks"].get("contexts", [])
+        strict = data["required_status_checks"].get("strict", False)
+        checks.append(f"- ✅ Required status checks: {', '.join(contexts) or 'none'} (strict: {strict})")
+    else:
+        checks.append("- ❌ No required status checks")
+
+    if data.get("required_pull_request_reviews"):
+        reviews = data["required_pull_request_reviews"]
+        approvals = reviews.get("required_approving_review_count", 0)
+        dismiss = "requires dismissal" if reviews.get("dismiss_stale_reviews") else ""
+        checks.append(f"- ✅ Required reviews: {approvals} approval(s) {dismiss}")
+    else:
+        checks.append("- ❌ No required reviews")
+
+    if data.get("enforce_admins", {}).get("enabled"):
+        checks.append("- ✅ Admin enforcement enabled")
+    else:
+        checks.append("- ❌ No admin enforcement")
+
+    if data.get("restrictions"):
+        users = data["restrictions"].get("users", [])
+        teams = data["restrictions"].get("teams", [])
+        users_str = ", ".join(u["login"] for u in users) if users else "none"
+        teams_str = ", ".join(t["slug"] for t in teams) if teams else "none"
+        checks.append(f"- 🔒 Push restrictions: users={users_str}, teams={teams_str}")
+    else:
+        checks.append("- ❌ No push restrictions")
+
+    if data.get("required_linear_history", {}).get("enabled"):
+        checks.append("- ✅ Linear history required")
+    if data.get("allow_force_pushes", {}).get("enabled"):
+        checks.append("- ⚠️ Force pushes allowed")
+    if data.get("allow_deletions", {}).get("enabled"):
+        checks.append("- ⚠️ Deletions allowed")
+
+    lines.extend(checks)
+    return "\n".join(lines)
+
+
+@tool(
+    name="repo_traffic",
+    description="Get repository traffic data (clones and views for the last 14 days).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def repo_traffic(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    lines = []
+    try:
+        views = _gh_json("api", f"repos/{repo}/traffic/views", timeout=15)
+        view_count = views.get("count", 0)
+        view_unique = views.get("uniques", 0)
+        lines.append(f"**Views (14 days):** {view_count} total, {view_unique} unique")
+    except RuntimeError:
+        lines.append("**Views:** N/A")
+
+    try:
+        clones = _gh_json("api", f"repos/{repo}/traffic/clones", timeout=15)
+        clone_count = clones.get("count", 0)
+        clone_unique = clones.get("uniques", 0)
+        lines.append(f"**Clones (14 days):** {clone_count} total, {clone_unique} unique")
+    except RuntimeError:
+        lines.append("**Clones:** N/A")
+
+    try:
+        referrers = _gh_json("api", f"repos/{repo}/traffic/popular/referrers", timeout=15)
+        if referrers:
+            top = referrers[0] if referrers else {}
+            lines.append(f"**Top referrer:** {top.get('referrer', '?')} ({top.get('count', 0)} views)")
+    except RuntimeError:
+        pass
+
+    try:
+        paths = _gh_json("api", f"repos/{repo}/traffic/popular/paths", timeout=15)
+        if paths:
+            top = paths[0] if paths else {}
+            lines.append(f"**Top path:** `{top.get('path', '?')}` ({top.get('count', 0)} views)")
+    except RuntimeError:
+        pass
+
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_licenses",
+    description="List all available open source license templates.",
+    parameters={},
+    required=[],
+)
+def list_licenses() -> str:
+    try:
+        data = _gh_json("api", "licenses", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No licenses found."
+
+    lines = []
+    for l in data:
+        desc = l.get("description", "")[:100]
+        featured = " ★" if l.get("featured") else ""
+        lines.append(f"- `{l['key']}`{featured} — **{l['name']}**")
+    return "\n".join(lines)
+
+
+@tool(
+    name="render_markdown",
+    description="Render GitHub Flavored Markdown text to HTML.",
+    parameters={
+        "text": {
+            "type": "string",
+            "description": "Markdown text to render.",
+        },
+        "mode": {
+            "type": "string",
+            "enum": ["markdown", "gfm"],
+            "description": "Render mode: markdown or gfm (GitHub Flavored Markdown). Default: gfm.",
+        },
+        "context": {
+            "type": "string",
+            "description": "Repository context for GFM (owner/repo) to resolve issues/mentions.",
+        },
+    },
+    required=["text"],
+)
+def render_markdown(text: str, mode: str = "gfm", context: str = "") -> str:
+    import json as j
+    payload = {"text": text, "mode": mode}
+    if context:
+        payload["context"] = context
+    try:
+        result = _gh("api", "markdown", "--method", "POST",
+                      "--raw-field", j.dumps(payload), "--jq", ".", timeout=15)
+        return result
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="watch_repo",
+    description="Subscribe to notifications for a repository (watch).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format.",
+        },
+    },
+    required=["repo"],
+)
+def watch_repo(repo: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/subscription", "--method", "PUT",
+            "--raw-field", '{"subscribed":true}', "--silent", timeout=15)
+        return f"Watching {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unwatch_repo",
+    description="Unsubscribe from notifications for a repository (unwatch).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format.",
+        },
+    },
+    required=["repo"],
+)
+def unwatch_repo(repo: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/subscription", "--method", "DELETE", "--silent", timeout=15)
+        return f"Unwatched {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="community_profile",
+    description="Get the community health / profile metrics for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def community_profile(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/community/profile", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    health = data.get("health_percentage", 0)
+    files = data.get("files", {})
+
+    lines = [
+        f"## Community Profile: {repo}",
+        f"**Health:** {health}%",
+        "",
+        "### Files",
+    ]
+
+    file_status = {
+        "code_of_conduct": "CODE_OF_CONDUCT",
+        "contributing": "CONTRIBUTING",
+        "issue_template": "Issue template",
+        "pull_request_template": "PR template",
+        "license": "License",
+        "readme": "README",
+        "funding": "FUNDING",
+    }
+
+    for key, label in file_status.items():
+        f = files.get(key, {})
+        if f:
+            lines.append(f"- ✅ **{label}** — {f.get('url', 'present')}")
+        else:
+            lines.append(f"- ❌ **{label}** — missing")
+
+    desc = data.get("description", "")
+    if desc:
+        lines.append(f"\n**Description:** {desc}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_deploy_keys",
+    description="List deploy keys on a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_deploy_keys(repo: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/keys?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No deploy keys found."
+
+    lines = []
+    for k in data:
+        title = k.get("title", "?")
+        key_id = k.get("id", "?")
+        read_only = "read-only" if k.get("read_only") else "read/write"
+        lines.append(f"- **{title}** (id={key_id}, {read_only})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="add_deploy_key",
+    description="Add a deploy key to a repository.",
+    parameters={
+        "title": {
+            "type": "string",
+            "description": "Title for the key.",
+        },
+        "key": {
+            "type": "string",
+            "description": "SSH public key content.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "read_only": {
+            "type": "boolean",
+            "description": "Restrict key to read-only access.",
+        },
+    },
+    required=["title", "key"],
+)
+def add_deploy_key(title: str, key: str, repo: str = "", read_only: bool = True) -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = j.dumps({"title": title, "key": key, "read_only": read_only})
+    try:
+        _gh("api", f"repos/{repo}/keys", "--method", "POST",
+            "--raw-field", payload, "--silent", timeout=15)
+        return f"Added deploy key '{title}' to {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_actions_artifacts",
+    description="List GitHub Actions artifacts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 10).",
+        },
+    },
+    required=[],
+)
+def list_actions_artifacts(repo: str = "", limit: int = 10) -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/artifacts?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    artifacts = data.get("artifacts", [])
+    if not artifacts:
+        return "No artifacts found."
+
+    lines = []
+    for a in artifacts:
+        name = a.get("name", "?")
+        size_kb = a.get("size_in_bytes", 0) // 1024
+        created = a.get("created_at", "?")
+        expired = "expired" if a.get("expired") else "active"
+        lines.append(f"- **{name}** ({size_kb} KB, {expired}) — {created}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_repo_secrets",
+    description="List names of secrets configured in a repository (values are never exposed).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_repo_secrets(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/secrets", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    secrets = data.get("secrets", [])
+    if not secrets:
+        return "No secrets found."
+
+    lines = []
+    for s in secrets:
+        created = s.get("created_at", "?")
+        updated = s.get("updated_at", "")
+        lines.append(f"- `{s['name']}` (created: {created})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="list_repo_variables",
+    description="List names of variables configured in a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_repo_variables(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/variables", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    variables = data.get("variables", [])
+    if not variables:
+        return "No variables found."
+
+    lines = []
+    for v in variables:
+        created = v.get("created_at", "?")
+        lines.append(f"- `{v['name']}` (created: {created})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_workflow_logs",
+    description="Get the download URL for workflow run logs.",
+    parameters={
+        "run_id": {
+            "type": "integer",
+            "description": "Workflow run ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["run_id"],
+)
+def get_workflow_logs(run_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/runs/{run_id}/logs", repo="", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return f"Logs URL: {data.get('url', 'N/A')}"
+
+
+@tool(
+    name="remove_issue_assignees",
+    description="Remove specific assignees from an issue or pull request.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number.",
+        },
+        "assignees": {
+            "type": "string",
+            "description": "Comma-separated GitHub usernames to remove.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number", "assignees"],
+)
+def remove_issue_assignees(number: int, assignees: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    args = ["issue", "edit", str(number), "--repo", repo]
+    for a in assignees.split(","):
+        a = a.strip()
+        if a:
+            args += ["--remove-assignee", a]
+    try:
+        _gh(*args)
+        return f"Removed assignees from #{number}: {assignees}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_repo_merge_options",
+    description="Configure which merge methods are allowed on a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "allow_merge_commit": {
+            "type": "boolean",
+            "description": "Allow merge commits.",
+        },
+        "allow_squash_merge": {
+            "type": "boolean",
+            "description": "Allow squash merging.",
+        },
+        "allow_rebase_merge": {
+            "type": "boolean",
+            "description": "Allow rebase merging.",
+        },
+        "delete_head_on_merge": {
+            "type": "boolean",
+            "description": "Automatically delete head branch on merge.",
+        },
+    },
+    required=[],
+)
+def set_repo_merge_options(repo: str = "", allow_merge_commit: bool | None = None, allow_squash_merge: bool | None = None, allow_rebase_merge: bool | None = None, delete_head_on_merge: bool | None = None) -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = {}
+    if allow_merge_commit is not None:
+        payload["allow_merge_commit"] = allow_merge_commit
+    if allow_squash_merge is not None:
+        payload["allow_squash_merge"] = allow_squash_merge
+    if allow_rebase_merge is not None:
+        payload["allow_rebase_merge"] = allow_rebase_merge
+    if delete_head_on_merge is not None:
+        payload["delete_head_on_merge"] = delete_head_on_merge
+    if not payload:
+        return "No options specified to change."
+    try:
+        _gh("api", f"repos/{repo}", "--method", "PATCH",
+            "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        return f"Updated merge options for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_issue_templates",
+    description="List available issue templates for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_issue_templates(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/issue-templates", timeout=15)
+    except RuntimeError:
+        pass
+    else:
+        if data:
+            lines = []
+            for t in data:
+                name = t.get("name", "?")
+                about = t.get("about", "")
+                about_str = f" — {about}" if about else ""
+                lines.append(f"- **{name}**{about_str}")
+            if lines:
+                return "\n".join(lines)
+
+    # Fallback: check for template files in .github/
+    try:
+        templates = _gh_json("api", f"repos/{repo}/contents/.github/ISSUE_TEMPLATE", timeout=15)
+        lines = []
+        for t in templates:
+            if t["type"] == "file":
+                lines.append(f"- `{t['name']}`")
+        if lines:
+            return "Issue templates:\n" + "\n".join(lines)
+    except RuntimeError:
+        pass
+
+    return "No issue templates found."
+
+
+@tool(
+    name="create_repo_from_template",
+    description="Create a repository from a template repository.",
+    parameters={
+        "template_repo": {
+            "type": "string",
+            "description": "Template repository in owner/repo format.",
+        },
+        "name": {
+            "type": "string",
+            "description": "New repository name.",
+        },
+        "owner": {
+            "type": "string",
+            "description": "Owner of the new repo (defaults to authenticated user).",
+        },
+        "description": {
+            "type": "string",
+            "description": "Description for the new repo.",
+        },
+        "private": {
+            "type": "boolean",
+            "description": "Create as private.",
+        },
+    },
+    required=["template_repo", "name"],
+)
+def create_repo_from_template(template_repo: str, name: str, owner: str = "", description: str = "", private: bool = False) -> str:
+    import json as j
+    payload = {"name": name, "private": private}
+    if owner:
+        payload["owner"] = owner
+    if description:
+        payload["description"] = description
+    try:
+        data = _gh_json("api", f"repos/{template_repo}/generate", "--method", "POST",
+                        "--raw-field", j.dumps(payload), timeout=30)
+        full_name = data.get("full_name", "?")
+        return f"Created {full_name} from template {template_repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_tools",
+    description="List all available tools in the GitHub Issues Manager with descriptions.",
+    parameters={
+        "category": {
+            "type": "string",
+            "description": "Optional category to filter by (issues, prs, labels, workflows, etc.).",
+        },
+    },
+    required=[],
+)
+def list_tools(category: str = "") -> str:
+    from . import REGISTRY
+    if not REGISTRY:
+        return "No tools registered."
+
+    # Group by prefix keywords
+    groups: dict[str, list[str]] = {}
+    for name, entry in REGISTRY.items():
+        desc = entry["schema"]["function"]["description"]
+        cat = "other"
+        if any(name.startswith(p) for p in ("list_issue", "view_issue", "create_issue", "close_issue", "reopen_", "comment_", "edit_issue", "search_issue", "add_issue", "remove_issue_", "lock_", "unlock_", "pin_", "unpin_", "transfer_issue", "set_issue_", "add_reaction")):
+            cat = "issues"
+        elif any(name.startswith(p) for p in ("list_pull", "view_pull", "create_pull", "merge_pull", "add_pr", "list_pr", "request_pr", "update_pr", "enable_auto_merge", "disable_auto_merge", "get_pr")):
+            cat = "prs"
+        elif any(name.startswith(p) for p in ("list_label", "create_label", "update_label", "delete_label")):
+            cat = "labels"
+        elif any(name.startswith(p) for p in ("list_milestone", "create_milestone", "set_issue_milestone")):
+            cat = "milestones"
+        elif any(name.startswith(p) for p in ("list_release", "create_release")):
+            cat = "releases"
+        elif any(name.startswith(p) for p in ("list_workflow", "trigger_", "cancel_", "rerun_", "get_wor")):
+            cat = "workflows"
+        elif any(name.startswith(p) for p in ("search_",)):
+            cat = "search"
+        elif any(name.startswith(p) for p in ("list_notif", "mark_notif")):
+            cat = "notifications"
+        elif any(name.startswith(p) for p in ("list_gist", "create_gist")):
+            cat = "gists"
+        elif any(name.startswith(p) for p in ("list_deploy", "add_deploy")):
+            cat = "deploy_keys"
+        elif any(name.startswith(p) for p in ("list_actions",)):
+            cat = "artifacts"
+        elif any(name.startswith(p) for p in ("list_dependabot", "list_code_", "list_secret_")):
+            cat = "security"
+        elif any(name.startswith(p) for p in ("list_webhook",)):
+            cat = "webhooks"
+        elif any(name.startswith(p) for p in ("get_branch",)):
+            cat = "branch_protection"
+        elif any(name.startswith(p) for p in ("repo_traffic",)):
+            cat = "traffic"
+        elif any(name.startswith(p) for p in ("list_repo_", "add_repo_", "get_repo_", "star_", "unstar_", "fork_", "create_repo", "archive_", "unarchive_", "change_repo_", "transfer_repo")):
+            cat = "repo_management"
+        elif any(name.startswith(p) for p in ("watch_", "unwatch_", "community_")):
+            cat = "community"
+        elif any(name.startswith(p) for p in ("render_", "list_licenses", "list_issue_events", "list_issue_template", "list_comment", "get_comment", "update_comment", "delete_comment", "list_pr_review", "list_commit", "list_tag", "create_commit_status", "compare_refs", "whoami", "rate_limit", "list_collab", "add_collab", "remove_collab", "list_branches", "delete_branch", "bulk_")):
+            cat = "other"
+        groups.setdefault(cat, []).append(f"  - `{name}`: {desc}")
+
+    if category:
+        category = category.lower()
+        for c, tools in groups.items():
+            if c.startswith(category) or category.startswith(c):
+                return "\n".join([f"## {c.upper()}"] + tools)
+        return f"No tools found in category '{category}'."
+
+    result = []
+    for c in sorted(groups.keys()):
+        result.append(f"\n## {c.upper()}")
+        result.extend(groups[c])
+    return "\n".join(result).strip()
