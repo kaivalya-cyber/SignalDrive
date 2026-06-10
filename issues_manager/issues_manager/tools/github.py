@@ -9514,17 +9514,6 @@ def get_vulnerability_alerts(repo: str = "") -> str:
 
 
 @tool(
-    name="list_tools",
-    description="List all available tools in the GitHub Issues Manager with descriptions.",
-    parameters={
-        "category": {
-            "type": "string",
-            "description": "Optional category to filter by (issues, prs, labels, workflows, etc.).",
-        },
-    },
-    required=[],
-)
-@tool(
     name="get_enterprise_audit_log",
     description="Get the audit log for an enterprise (requires enterprise admin).",
     parameters={
@@ -10055,6 +10044,101 @@ def update_code_scanning_default_setup(state: str, languages: str = "", query_su
         _gh("api", f"repos/{repo}/code-scanning/default-setup", "--method", "PATCH",
             "--raw-field", j.dumps(payload), "--silent", timeout=15)
         return f"Code scanning default setup updated for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_environment_secret",
+    description="Get a single environment-level secret.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "env": {"type": "string", "description": "Environment name"},
+        "name": {"type": "string", "description": "Secret name"},
+    },
+    required=["repo", "env", "name"],
+)
+def get_environment_secret(repo: str, env: str, name: str) -> str:
+    try:
+        d = _gh_json("secret", "list", "--env", env, "--repo", repo)
+        for s in d.get("secrets", []):
+            if s.get("name") == name:
+                return json.dumps(s, indent=2)
+        return f"Secret '{name}' not found in environment '{env}'."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_environment_secret",
+    description="Create or update a secret in an environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "env": {"type": "string", "description": "Environment name"},
+        "name": {"type": "string", "description": "Secret name"},
+        "value": {"type": "string", "description": "Secret value"},
+    },
+    required=["repo", "env", "name", "value"],
+)
+def create_environment_secret(repo: str, env: str, name: str, value: str) -> str:
+    try:
+        _gh("secret", "set", name, "--env", env, "--repo", repo, "--body", value, timeout=15)
+        return f"Secret '{name}' set in environment '{env}'."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_environment_secret",
+    description="Delete a secret from an environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "env": {"type": "string", "description": "Environment name"},
+        "name": {"type": "string", "description": "Secret name"},
+    },
+    required=["repo", "env", "name"],
+)
+def delete_environment_secret(repo: str, env: str, name: str) -> str:
+    try:
+        _gh("secret", "delete", name, "--env", env, "--repo", repo, timeout=15)
+        return f"Secret '{name}' deleted from environment '{env}'."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_environment_variable",
+    description="Create or update a variable in an environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "env": {"type": "string", "description": "Environment name"},
+        "name": {"type": "string", "description": "Variable name"},
+        "value": {"type": "string", "description": "Variable value"},
+    },
+    required=["repo", "env", "name", "value"],
+)
+def create_environment_variable(repo: str, env: str, name: str, value: str) -> str:
+    try:
+        _gh("variable", "set", name, "--env", env, "--repo", repo, "--body", value, timeout=15)
+        return f"Variable '{name}' set in environment '{env}'."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_environment_variable",
+    description="Delete a variable from an environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "env": {"type": "string", "description": "Environment name"},
+        "name": {"type": "string", "description": "Variable name"},
+    },
+    required=["repo", "env", "name"],
+)
+def delete_environment_variable(repo: str, env: str, name: str) -> str:
+    try:
+        _gh("variable", "delete", name, "--env", env, "--repo", repo, timeout=15)
+        return f"Variable '{name}' deleted from environment '{env}'."
     except RuntimeError as e:
         return f"Error: {e}"
 
