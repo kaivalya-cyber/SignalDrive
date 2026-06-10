@@ -10328,6 +10328,136 @@ def list_runner_groups(org: str) -> str:
 
 
 @tool(
+    name="create_team",
+    description="Create a new team in an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "name": {"type": "string", "description": "Team name"},
+        "description": {"type": "string", "description": "Team description"},
+        "privacy": {"type": "string", "description": "Privacy level: secret or closed"},
+        "parent_team_id": {"type": "string", "description": "Parent team ID (optional)"},
+    },
+    required=["org", "name"],
+)
+def create_team(org: str, name: str, description: str = "", privacy: str = "", parent_team_id: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"name": name}
+        if description:
+            payload["description"] = description
+        if privacy:
+            payload["privacy"] = privacy
+        if parent_team_id:
+            payload["parent_team_id"] = int(parent_team_id)
+        return _gh("api", f"orgs/{org}/teams", "--method", "POST", "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_team",
+    description="Update a team's settings in an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+        "name": {"type": "string", "description": "New team name"},
+        "description": {"type": "string", "description": "New team description"},
+        "privacy": {"type": "string", "description": "Privacy level: secret or closed"},
+    },
+    required=["org", "team_slug"],
+)
+def update_team(org: str, team_slug: str, name: str = "", description: str = "", privacy: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if name:
+            payload["name"] = name
+        if description:
+            payload["description"] = description
+        if privacy:
+            payload["privacy"] = privacy
+        return _gh("api", f"orgs/{org}/teams/{team_slug}", "--method", "PATCH", "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_team",
+    description="Delete a team from an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+    },
+    required=["org", "team_slug"],
+)
+def delete_team(org: str, team_slug: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/teams/{team_slug}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Team '{team_slug}' deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="add_team_repo",
+    description="Add a repository to a team (granting access).",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+        "owner": {"type": "string", "description": "Repo owner"},
+        "repo": {"type": "string", "description": "Repo name"},
+        "permission": {"type": "string", "description": "Permission level: pull, push, admin, maintain, triage"},
+    },
+    required=["org", "team_slug", "owner", "repo"],
+)
+def add_team_repo(org: str, team_slug: str, owner: str, repo: str, permission: str = "") -> str:
+    try:
+        args = ["api", f"orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}", "--method", "PUT", "--silent"]
+        if permission:
+            import json as j
+            args += ["--raw-field", j.dumps({"permission": permission})]
+        _gh(*args, timeout=15)
+        return f"Repo {owner}/{repo} added to team '{team_slug}'."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_team_repo",
+    description="Remove a repository from a team.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+        "owner": {"type": "string", "description": "Repo owner"},
+        "repo": {"type": "string", "description": "Repo name"},
+    },
+    required=["org", "team_slug", "owner", "repo"],
+)
+def remove_team_repo(org: str, team_slug: str, owner: str, repo: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Repo {owner}/{repo} removed from team '{team_slug}'."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_team_projects",
+    description="List projects associated with a team.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+    },
+    required=["org", "team_slug"],
+)
+def list_team_projects(org: str, team_slug: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/teams/{team_slug}/projects")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
