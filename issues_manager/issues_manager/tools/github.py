@@ -10612,6 +10612,184 @@ def redeliver_webhook_delivery(repo: str, hook_id: str, delivery_id: str) -> str
 
 
 @tool(
+    name="get_project",
+    description="Get a project (classic) by its ID.",
+    parameters={
+        "project_id": {"type": "string", "description": "Project ID"},
+    },
+    required=["project_id"],
+)
+def get_project(project_id: str) -> str:
+    try:
+        return _gh("api", f"projects/{project_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_project",
+    description="Update a project (classic).",
+    parameters={
+        "project_id": {"type": "string", "description": "Project ID"},
+        "name": {"type": "string", "description": "New project name"},
+        "body": {"type": "string", "description": "New project body/description"},
+        "state": {"type": "string", "description": "Project state: open or closed"},
+    },
+    required=["project_id"],
+)
+def update_project(project_id: str, name: str = "", body: str = "", state: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if name:
+            payload["name"] = name
+        if body:
+            payload["body"] = body
+        if state:
+            payload["state"] = state
+        return _gh("api", f"projects/{project_id}", "--method", "PATCH", "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_project",
+    description="Delete a project (classic).",
+    parameters={
+        "project_id": {"type": "string", "description": "Project ID"},
+    },
+    required=["project_id"],
+)
+def delete_project(project_id: str) -> str:
+    try:
+        _gh("api", f"projects/{project_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Project {project_id} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_project_columns",
+    description="List columns in a project (classic).",
+    parameters={
+        "project_id": {"type": "string", "description": "Project ID"},
+    },
+    required=["project_id"],
+)
+def list_project_columns(project_id: str) -> str:
+    try:
+        return _gh("api", f"projects/{project_id}/columns")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_project_card",
+    description="Create a card in a project column (classic).",
+    parameters={
+        "column_id": {"type": "string", "description": "Column ID"},
+        "content_id": {"type": "string", "description": "Issue or PR ID (leave empty for note)"},
+        "content_type": {"type": "string", "description": "Content type: Issue or PullRequest"},
+        "note": {"type": "string", "description": "Note text (if not linked to issue/PR)"},
+    },
+    required=["column_id"],
+)
+def create_project_card(column_id: str, content_id: str = "", content_type: str = "", note: str = "") -> str:
+    try:
+        import json as j
+        if note:
+            payload: dict = {"note": note}
+        else:
+            payload = {"content_id": int(content_id), "content_type": content_type}
+        return _gh("api", f"projects/columns/{column_id}/cards", "--method", "POST",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="move_project_card",
+    description="Move a card within a project column.",
+    parameters={
+        "card_id": {"type": "string", "description": "Card ID"},
+        "position": {"type": "string", "description": "Position: top, bottom, or after:<card-id>"},
+        "column_id": {"type": "string", "description": "Target column ID"},
+    },
+    required=["card_id", "position"],
+)
+def move_project_card(card_id: str, position: str, column_id: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"position": position}
+        if column_id:
+            payload["column_id"] = int(column_id)
+        return _gh("api", f"projects/columns/cards/{card_id}/moves", "--method", "POST",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_check_suite",
+    description="Get a single check suite by its ID.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "suite_id": {"type": "string", "description": "Check suite ID"},
+    },
+    required=["repo", "suite_id"],
+)
+def get_check_suite(repo: str, suite_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/check-suites/{suite_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_check_suite_annotations",
+    description="List annotations for a check run.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "run_id": {"type": "string", "description": "Check run ID"},
+    },
+    required=["repo", "run_id"],
+)
+def list_check_suite_annotations(repo: str, run_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/check-runs/{run_id}/annotations")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_check_run",
+    description="Update a check run's output, status, or conclusion.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "run_id": {"type": "string", "description": "Check run ID"},
+        "status": {"type": "string", "description": "Status: queued, in_progress, completed"},
+        "conclusion": {"type": "string", "description": "Conclusion: success, failure, neutral, cancelled, skipped, timed_out, action_required"},
+        "output": {"type": "string", "description": "Output summary JSON (title, summary, text)"},
+    },
+    required=["repo", "run_id"],
+)
+def update_check_run(repo: str, run_id: str, status: str = "", conclusion: str = "", output: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if status:
+            payload["status"] = status
+        if conclusion:
+            payload["conclusion"] = conclusion
+        if output:
+            payload["output"] = j.loads(output)
+        return _gh("api", f"repos/{repo}/check-runs/{run_id}", "--method", "PATCH",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
