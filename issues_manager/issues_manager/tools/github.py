@@ -11117,6 +11117,127 @@ def get_deployment_status(repo: str, deployment_id: str, status_id: str) -> str:
 
 
 @tool(
+    name="get_oidc_subject_claims_customization",
+    description="Get the OIDC subject claim customization for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def get_oidc_subject_claims_customization(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/actions/oidc/customization/sub")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_oidc_subject_claims_customization",
+    description="Update the OIDC subject claim customization for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "use_default": {"type": "string", "description": "true/false: use default claims"},
+        "include_claim_keys": {"type": "string", "description": "JSON array of claim keys to include"},
+    },
+    required=["org", "use_default"],
+)
+def update_oidc_subject_claims_customization(org: str, use_default: str, include_claim_keys: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"use_default": use_default.lower() == "true"}
+        if include_claim_keys:
+            payload["include_claim_keys"] = j.loads(include_claim_keys)
+        return _gh("api", f"orgs/{org}/actions/oidc/customization/sub", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="search_commits",
+    description="Search for commits with a query.",
+    parameters={
+        "q": {"type": "string", "description": "Search query (e.g., repo:owner/name commit message)"},
+        "limit": {"type": "string", "description": "Max results (default: 10)"},
+    },
+    required=["q"],
+)
+def search_commits(q: str, limit: str = "10") -> str:
+    try:
+        return _gh("api", f"search/commits?q={q.replace(' ', '+')}&per_page={limit}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="search_topics",
+    description="Search for topics on GitHub.",
+    parameters={
+        "q": {"type": "string", "description": "Search query"},
+        "limit": {"type": "string", "description": "Max results (default: 10)"},
+    },
+    required=["q"],
+)
+def search_topics(q: str, limit: str = "10") -> str:
+    try:
+        return _gh("api", f"search/topics?q={q.replace(' ', '+')}&per_page={limit}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="search_labels",
+    description="Search for labels in a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "q": {"type": "string", "description": "Search query for label name"},
+        "limit": {"type": "string", "description": "Max results (default: 10)"},
+    },
+    required=["repo", "q"],
+)
+def search_labels(repo: str, q: str, limit: str = "10") -> str:
+    try:
+        return _gh("api", f"search/labels?repository_id={repo.replace('/', '%2F')}&q={q.replace(' ', '+')}&per_page={limit}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_org_webhook",
+    description="Update an organization webhook.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "hook_id": {"type": "string", "description": "Webhook ID"},
+        "config_url": {"type": "string", "description": "New payload URL"},
+        "config_secret": {"type": "string", "description": "New secret"},
+        "events": {"type": "string", "description": "Comma-separated events"},
+        "active": {"type": "string", "description": "true/false: webhook active"},
+    },
+    required=["org", "hook_id"],
+)
+def update_org_webhook(org: str, hook_id: str, config_url: str = "", config_secret: str = "",
+                        events: str = "", active: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        config: dict = {}
+        if config_url:
+            config["url"] = config_url
+        if config_secret:
+            config["secret"] = config_secret
+        if config:
+            payload["config"] = config
+        if events:
+            payload["events"] = [e.strip() for e in events.split(",") if e.strip()]
+        if active:
+            payload["active"] = active.lower() == "true"
+        return _gh("api", f"orgs/{org}/hooks/{hook_id}", "--method", "PATCH",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
