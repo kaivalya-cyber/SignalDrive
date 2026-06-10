@@ -77,11 +77,16 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Gists       | `list_gists`, `create_gist` |
 | Repository  | `get_repo_info`, `list_branches`, `delete_branch`, `whoami`, `list_contributors`, `rate_limit`, `fork_repo`, `star_repo`, `unstar_repo`, `create_repo`, `compare_refs` |
 | Milestones  | `list_milestones`, `create_milestone`, `set_issue_milestone` |
-| Security    | `list_dependabot_alerts` |
-| Deployments | `list_deployments` |
-| Topics      | `list_repo_topics`, `add_repo_topic` |
-| Reactions   | `add_reaction` |
-| Other       | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `update_pr_branch` |
+| Security      | `list_dependabot_alerts` |
+| Deployments   | `list_deployments` |
+| Topics        | `list_repo_topics`, `add_repo_topic` |
+| Labels        | `list_labels`, `create_label`, `update_label`, `delete_label` |
+| Collaborators | `list_collaborators`, `add_collaborator` |
+| Workflow Mgmt | `cancel_workflow_run`, `rerun_workflow` |
+| Repo Mgmt     | `archive_repo`, `unarchive_repo`, `change_repo_visibility`, `list_repo_languages`, `get_repo_license` |
+| Reactions     | `add_reaction` |
+| Pins          | `pin_issue`, `unpin_issue` |
+| Other         | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `update_pr_branch` |
 
 ## Architecture
 

@@ -96,6 +96,14 @@ Other:
 - list_repo_topics / add_repo_topic: Manage repository topics
 - list_dependabot_alerts: List Dependabot security alerts
 - list_deployments: List deployments with environment info
+- archive_repo / unarchive_repo: Archive or unarchive a repository
+- change_repo_visibility: Change repo to public/private/internal
+- pin_issue / unpin_issue: Pin/unpin issues to repo overview
+- update_label / delete_label: Update or delete labels
+- list_collaborators / add_collaborator: Manage repo access
+- cancel_workflow_run / rerun_workflow: Manage workflow runs
+- get_repo_license: Get license content
+- list_repo_languages: Get language breakdown with bar chart
 - lock_issue: Lock conversation on issue/PR (off_topic, too_heated, resolved, spam)
 - unlock_issue: Unlock conversation
 - transfer_issue: Transfer an issue to another repo

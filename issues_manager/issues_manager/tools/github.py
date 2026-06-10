@@ -2314,3 +2314,372 @@ def list_deployments(repo: str = "", environment: str = "", limit: int = 10) -> 
         status = "active" if d.get("statuses_url") else "?"
         lines.append(f"- `{ref}` → **{env}** by {creator} ({created}) [{status}]")
     return "\n".join(lines)
+
+
+@tool(
+    name="archive_repo",
+    description="Archive a repository (makes it read-only).",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def archive_repo(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}", "--method", "PATCH",
+            "--raw-field", 'archived=true', timeout=15)
+        return f"Archived {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unarchive_repo",
+    description="Unarchive a previously archived repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def unarchive_repo(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}", "--method", "PATCH",
+            "--raw-field", 'archived=false', timeout=15)
+        return f"Unarchived {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="change_repo_visibility",
+    description="Change repository visibility (public/private/internal).",
+    parameters={
+        "visibility": {
+            "type": "string",
+            "enum": ["public", "private", "internal"],
+            "description": "New visibility setting.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["visibility"],
+)
+def change_repo_visibility(visibility: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("repo", "edit", repo, f"--{visibility}")
+        return f"Changed {repo} visibility to {visibility}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="pin_issue",
+    description="Pin an issue or pull request to the repository overview page.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number to pin.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def pin_issue(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/pin", "--method", "POST", "--silent", timeout=15)
+        return f"Pinned #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unpin_issue",
+    description="Unpin an issue or pull request from the repository overview.",
+    parameters={
+        "number": {
+            "type": "integer",
+            "description": "Issue or PR number to unpin.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["number"],
+)
+def unpin_issue(number: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/issues/{number}/pin", "--method", "DELETE", "--silent", timeout=15)
+        return f"Unpinned #{number}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_label",
+    description="Update a label's name, color, or description.",
+    parameters={
+        "current_name": {
+            "type": "string",
+            "description": "Current label name.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "new_name": {
+            "type": "string",
+            "description": "New label name (if renaming).",
+        },
+        "color": {
+            "type": "string",
+            "description": "New hex color code without # (e.g. 'ff0000').",
+        },
+        "description": {
+            "type": "string",
+            "description": "New description.",
+        },
+    },
+    required=["current_name"],
+)
+def update_label(current_name: str, repo: str = "", new_name: str = "", color: str = "", description: str = "") -> str:
+    repo = repo or _get_repo()
+    import urllib.parse
+    encoded_name = urllib.parse.quote(current_name, safe='')
+    args = ["api", f"repos/{repo}/labels/{encoded_name}", "--method", "PATCH"]
+    if new_name:
+        args += ["--raw-field", f'new_name={new_name}']
+    if color:
+        args += ["--raw-field", f'color={color}']
+    if description:
+        args += ["--raw-field", f'description={description}']
+    try:
+        _gh(*args, timeout=15)
+        return f"Updated label '{current_name}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_label",
+    description="Delete a label from a repository.",
+    parameters={
+        "name": {
+            "type": "string",
+            "description": "Label name to delete.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["name"],
+)
+def delete_label(name: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import urllib.parse
+    encoded_name = urllib.parse.quote(name, safe='')
+    try:
+        _gh("api", f"repos/{repo}/labels/{encoded_name}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Deleted label '{name}'"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_collaborators",
+    description="List collaborators (users with access) on a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "role": {
+            "type": "string",
+            "enum": ["admin", "maintain", "push", "triage", "pull"],
+            "description": "Filter by role.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=[],
+)
+def list_collaborators(repo: str = "", role: str = "", limit: int = 20) -> str:
+    repo = repo or _get_repo()
+    query = f"per_page={limit}"
+    if role:
+        query += f"&role={role}"
+    try:
+        data = _gh_json("api", f"repos/{repo}/collaborators?{query}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No collaborators found."
+
+    lines = []
+    for c in data:
+        perms = c.get("role_name", c.get("permissions", {}).get("admin", ""))
+        lines.append(f"- **{c['login']}** — {perms}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="add_collaborator",
+    description="Add a collaborator to a repository with a specific permission level.",
+    parameters={
+        "username": {
+            "type": "string",
+            "description": "GitHub username to add.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "permission": {
+            "type": "string",
+            "enum": ["pull", "push", "admin", "maintain", "triage"],
+            "description": "Permission level (default: push).",
+        },
+    },
+    required=["username"],
+)
+def add_collaborator(username: str, repo: str = "", permission: str = "push") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/collaborators/{username}", "--method", "PUT",
+            "--raw-field", f'permission={permission}', "--silent", timeout=15)
+        return f"Added {username} as {permission} to {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="cancel_workflow_run",
+    description="Cancel a running GitHub Actions workflow run.",
+    parameters={
+        "run_id": {
+            "type": "integer",
+            "description": "Workflow run ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["run_id"],
+)
+def cancel_workflow_run(run_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/actions/runs/{run_id}/cancel", "--method", "POST", "--silent", timeout=15)
+        return f"Cancelled workflow run {run_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="rerun_workflow",
+    description="Rerun a failed or cancelled workflow run.",
+    parameters={
+        "run_id": {
+            "type": "integer",
+            "description": "Workflow run ID to rerun.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+        "failed_jobs": {
+            "type": "boolean",
+            "description": "Only rerun failed jobs.",
+        },
+    },
+    required=["run_id"],
+)
+def rerun_workflow(run_id: int, repo: str = "", failed_jobs: bool = False) -> str:
+    repo = repo or _get_repo()
+    endpoint = f"repos/{repo}/actions/runs/{run_id}/rerun-failed-jobs" if failed_jobs else f"repos/{repo}/actions/runs/{run_id}/rerun"
+    try:
+        _gh("api", endpoint, "--method", "POST", "--silent", timeout=15)
+        return f"Reran workflow run {run_id}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_license",
+    description="Get the license content for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_repo_license(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/license", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    license_name = data.get("license", {}).get("name", "Unknown") if data.get("license") else "Unknown"
+    key = data.get("license", {}).get("key", "?") if data.get("license") else "?"
+    content = data.get("content", "")
+    import base64
+    try:
+        decoded = base64.b64decode(content).decode("utf-8") if content else "No content"
+    except Exception:
+        decoded = "Could not decode license content"
+    return f"## License: {license_name} ({key})\n\n```\n{decoded[:2000]}{'...' if len(decoded) > 2000 else ''}\n```"
+
+
+@tool(
+    name="list_repo_languages",
+    description="Get the programming language breakdown by bytes for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_repo_languages(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/languages", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    if not data:
+        return "No language data available."
+
+    total = sum(data.values())
+    sorted_langs = sorted(data.items(), key=lambda x: x[1], reverse=True)
+    lines = []
+    for lang, bytes_count in sorted_langs:
+        pct = (bytes_count / total) * 100 if total > 0 else 0
+        bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
+        lines.append(f"- {bar} **{lang}** {pct:.1f}% ({bytes_count:,} bytes)")
+    return "\n".join(lines)

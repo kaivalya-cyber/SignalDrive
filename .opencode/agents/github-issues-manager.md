@@ -236,6 +236,58 @@ Set priority on an issue. Levels: critical, high, medium, low.
 ### `gh api repos/<owner>/<repo>/pulls/<number>/update-branch --method PUT`
 Update a PR branch with latest base.
 
+## Repository management commands
+
+### `gh repo edit <repo> --public|--private|--internal`
+Change repository visibility.
+
+### `gh api repos/<owner>/<repo> --method PATCH --raw-field 'archived=true'`
+Archive a repository.
+
+### `gh api repos/<owner>/<repo> --method PATCH --raw-field 'archived=false'`
+Unarchive a repository.
+
+### `gh api repos/<owner>/<repo>/languages`
+Get language breakdown by bytes.
+
+### `gh api repos/<owner>/<repo>/license`
+Get repository license content.
+
+## Pin / unpin commands
+
+### `gh api repos/<owner>/<repo>/issues/<number>/pin --method POST`
+Pin an issue or PR to the repo overview.
+
+### `gh api repos/<owner>/<repo>/issues/<number>/pin --method DELETE`
+Unpin an issue or PR.
+
+## Label management commands
+
+### `gh api repos/<owner>/<repo>/labels/<name> --method PATCH [--raw-field new_name=...] [--raw-field color=...] [--raw-field description=...]`
+Update a label.
+
+### `gh api repos/<owner>/<repo>/labels/<name> --method DELETE`
+Delete a label.
+
+## Collaborator commands
+
+### `gh api repos/<owner>/<repo>/collaborators?per_page=<N>&role=<role>`
+List collaborators.
+
+### `gh api repos/<owner>/<repo>/collaborators/<username> --method PUT --raw-field permission=<perm>`
+Add a collaborator with pull/push/admin/maintain/triage access.
+
+## Workflow management commands
+
+### `gh api repos/<owner>/<repo>/actions/runs/<id>/cancel --method POST`
+Cancel a running workflow.
+
+### `gh api repos/<owner>/<repo>/actions/runs/<id>/rerun --method POST`
+Rerun a workflow.
+
+### `gh api repos/<owner>/<repo>/actions/runs/<id>/rerun-failed-jobs --method POST`
+Rerun only failed jobs.
+
 ## Workflow
 
 1. Ask which repository if not obvious (default: current repo from git remote).
