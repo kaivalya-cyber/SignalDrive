@@ -6825,6 +6825,734 @@ def list_gist_comments(gist_id: str) -> str:
 
 
 @tool(
+    name="list_org_webhooks",
+    description="List webhooks for an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+    },
+    required=["org"],
+)
+def list_org_webhooks(org: str) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/hooks", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No org webhooks."
+    lines = []
+    for h in data:
+        h_id = h.get("id", "?")
+        url = h.get("config", {}).get("url", "?")
+        active = h.get("active", False)
+        events = ", ".join(h.get("events", []))
+        lines.append(f"- **#{h_id}** ({'✅' if active else '❌'}) {url} — [{events}]")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_org_webhook",
+    description="Create a webhook for an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "url": {
+            "type": "string",
+            "description": "Payload URL.",
+        },
+        "events": {
+            "type": "string",
+            "description": "Comma-separated event names.",
+        },
+        "secret": {
+            "type": "string",
+            "description": "Webhook secret.",
+        },
+    },
+    required=["org", "url"],
+)
+def create_org_webhook(org: str, url: str, events: str = "push", secret: str = "") -> str:
+    import json as j
+    config = {"url": url, "content_type": "json"}
+    if secret:
+        config["secret"] = secret
+    event_list = [e.strip() for e in events.split(",") if e.strip()]
+    payload = j.dumps({"name": "web", "config": config, "events": event_list, "active": True})
+    try:
+        data = _gh_json("api", f"orgs/{org}/hooks", "--method", "POST",
+                        "--raw-field", payload, timeout=15)
+        hook_id = data.get("id", "?")
+        return f"Org webhook #{hook_id} created for {org}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_org_webhook",
+    description="Delete an organization webhook.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "hook_id": {
+            "type": "integer",
+            "description": "Webhook ID.",
+        },
+    },
+    required=["org", "hook_id"],
+)
+def delete_org_webhook(org: str, hook_id: int) -> str:
+    try:
+        _gh("api", f"orgs/{org}/hooks/{hook_id}", "--method", "DELETE", "--silent", timeout=15)
+        return f"Org webhook #{hook_id} deleted from {org}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="check_org_membership",
+    description="Check if a user is a member of an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "username": {
+            "type": "string",
+            "description": "GitHub username.",
+        },
+    },
+    required=["org", "username"],
+)
+def check_org_membership(org: str, username: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/members/{username}", "--method", "GET", "--silent", timeout=15)
+        return f"✅ **{username}** is a member of **{org}**"
+    except RuntimeError as e:
+        return f"❌ **{username}** is not a member of **{org}**"
+
+
+@tool(
+    name="get_org_membership",
+    description="Get organization membership details for a user.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "username": {
+            "type": "string",
+            "description": "GitHub username.",
+        },
+    },
+    required=["org", "username"],
+)
+def get_org_membership(org: str, username: str) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/memberships/{username}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return (
+        f"**User:** {data.get('user', {}).get('login', '?')}\n"
+        f"**Role:** {data.get('role', '?')}\n"
+        f"**State:** {data.get('state', '?')}"
+    )
+
+
+@tool(
+    name="set_team_membership",
+    description="Add or update a user's role on a team.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "team_slug": {
+            "type": "string",
+            "description": "Team slug.",
+        },
+        "username": {
+            "type": "string",
+            "description": "GitHub username.",
+        },
+        "role": {
+            "type": "string",
+            "enum": ["member", "maintainer"],
+            "description": "Team role (default: member).",
+        },
+    },
+    required=["org", "team_slug", "username"],
+)
+def set_team_membership(org: str, team_slug: str, username: str, role: str = "member") -> str:
+    import json as j
+    payload = j.dumps({"role": role})
+    try:
+        _gh("api", f"orgs/{org}/teams/{team_slug}/memberships/{username}",
+            "--method", "PUT", "--raw-field", payload, "--silent", timeout=15)
+        return f"{username} added to team {team_slug} as {role}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_team_member",
+    description="Remove a user from a team.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "team_slug": {
+            "type": "string",
+            "description": "Team slug.",
+        },
+        "username": {
+            "type": "string",
+            "description": "GitHub username.",
+        },
+    },
+    required=["org", "team_slug", "username"],
+)
+def remove_team_member(org: str, team_slug: str, username: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/teams/{team_slug}/memberships/{username}",
+            "--method", "DELETE", "--silent", timeout=15)
+        return f"{username} removed from team {team_slug}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="generate_release_notes",
+    description="Generate release notes from a git tag or commit range.",
+    parameters={
+        "tag_name": {
+            "type": "string",
+            "description": "Name of the new tag.",
+        },
+        "previous_tag": {
+            "type": "string",
+            "description": "Previous tag to compare against.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["tag_name"],
+)
+def generate_release_notes(tag_name: str, previous_tag: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {"tag_name": tag_name}
+    if previous_tag:
+        payload["target_commitish"] = previous_tag
+    try:
+        data = _gh_json("api", f"repos/{repo}/releases/generate-notes", "--method", "POST",
+                        "--raw-field", j.dumps(payload), timeout=15)
+        return data.get("body", "No notes generated.")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="trigger_workflow_with_inputs",
+    description="Trigger a workflow dispatch event with custom inputs.",
+    parameters={
+        "workflow": {
+            "type": "string",
+            "description": "Workflow file name (e.g. ci.yml) or ID.",
+        },
+        "ref": {
+            "type": "string",
+            "description": "Branch or tag name (default: default branch).",
+        },
+        "inputs": {
+            "type": "string",
+            "description": "JSON string of key-value inputs (e.g. {\"key\":\"value\"}).",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["workflow"],
+)
+def trigger_workflow_with_inputs(workflow: str, ref: str = "", inputs: str = "{}", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = {"ref": ref or f"refs/heads/{_default_branch(repo)}"}
+    parsed = j.loads(inputs)
+    if parsed:
+        payload["inputs"] = parsed
+    try:
+        _gh("api", f"repos/{repo}/actions/workflows/{workflow}/dispatches",
+            "--method", "POST", "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        inputs_desc = f" with inputs: {inputs}" if parsed else ""
+        return f"Workflow '{workflow}' triggered on {payload['ref']}{inputs_desc}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+def _default_branch(repo: str) -> str:
+    """Helper: get default branch name for a repo."""
+    try:
+        data = _gh_json("api", f"repos/{repo}", timeout=10)
+        return data.get("default_branch", "main")
+    except Exception:
+        return "main"
+
+
+@tool(
+    name="enable_vulnerability_alerts",
+    description="Enable Dependabot vulnerability alerts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def enable_vulnerability_alerts(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/vulnerability-alerts", "--method", "PUT", "--silent", timeout=15)
+        return f"Vulnerability alerts enabled for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="disable_vulnerability_alerts",
+    description="Disable Dependabot vulnerability alerts for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def disable_vulnerability_alerts(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/vulnerability-alerts", "--method", "DELETE", "--silent", timeout=15)
+        return f"Vulnerability alerts disabled for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="enable_automatic_security_fixes",
+    description="Enable automatic security fixes for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def enable_automatic_security_fixes(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/automated-security-fixes", "--method", "PUT", "--silent", timeout=15)
+        return f"Automatic security fixes enabled for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="disable_automatic_security_fixes",
+    description="Disable automatic security fixes for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def disable_automatic_security_fixes(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/automated-security-fixes", "--method", "DELETE", "--silent", timeout=15)
+        return f"Automatic security fixes disabled for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_merge_queue_entries",
+    description="List entries in the merge queue for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def list_merge_queue_entries(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/merge-queue/entries", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No merge queue entries."
+    lines = []
+    for e in data:
+        pr_num = e.get("pull_request", {}).get("number", "?")
+        title = e.get("pull_request", {}).get("title", "?")
+        state = e.get("state", "?")
+        enqueued = e.get("enqueued_at", "?")
+        lines.append(f"- **#{pr_num}** ({state}): {title} — enqueued {enqueued}")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_repo_interaction_limits",
+    description="Get interaction limits for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_repo_interaction_limits(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/interaction-limits", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    limit = data.get("limit", "none")
+    origin = data.get("origin", "?")
+    expires = data.get("expires_at", "?")
+    return f"**Interaction limit:** {limit} (set by: {origin}, expires: {expires})"
+
+
+@tool(
+    name="set_repo_interaction_limits",
+    description="Set interaction limits for a repository.",
+    parameters={
+        "limit": {
+            "type": "string",
+            "enum": ["collaborators_only", "contributors_only", "existing_users"],
+            "description": "Interaction limit level.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["limit"],
+)
+def set_repo_interaction_limits(limit: str, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload = j.dumps({"limit": limit})
+    try:
+        _gh("api", f"repos/{repo}/interaction-limits", "--method", "PUT",
+            "--raw-field", payload, "--silent", timeout=15)
+        return f"Interaction limit set to '{limit}' for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_repo_interaction_limits",
+    description="Remove interaction limits for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def remove_repo_interaction_limits(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        _gh("api", f"repos/{repo}/interaction-limits", "--method", "DELETE", "--silent", timeout=15)
+        return f"Interaction limits removed for {repo}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_release",
+    description="Get a specific release by ID.",
+    parameters={
+        "release_id": {
+            "type": "integer",
+            "description": "Release ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["release_id"],
+)
+def get_release(release_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/releases/{release_id}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return (
+        f"**Release:** {data.get('name', '?')} (tag: {data.get('tag_name', '?')})\n"
+        f"**Draft:** {data.get('draft', False)}  **Prerelease:** {data.get('prerelease', False)}\n"
+        f"**Published:** {data.get('published_at', '?')}\n"
+        f"**Assets:** {len(data.get('assets', []))}\n"
+        f"**Body:** {data.get('body', '')[:500]}"
+    )
+
+
+@tool(
+    name="get_workflow_usage",
+    description="Get workflow usage statistics (billable minutes).",
+    parameters={
+        "workflow_id": {
+            "type": "integer",
+            "description": "Workflow ID.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["workflow_id"],
+)
+def get_workflow_usage(workflow_id: int, repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/actions/workflows/{workflow_id}/timing", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    billable = data.get("billable", {})
+    lines = [f"**Workflow #{workflow_id} usage:**"]
+    for os_name, minutes in billable.items():
+        total_ms = minutes.get("total_ms", 0)
+        total_min = total_ms / 60000
+        lines.append(f"- **{os_name}**: {total_min:.1f} min ({total_ms} ms)")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_app",
+    description="Get info about the currently authenticated GitHub App.",
+    parameters={},
+    required=[],
+)
+def get_app() -> str:
+    try:
+        data = _gh_json("api", "app", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    return (
+        f"**App:** {data.get('name', '?')}\n"
+        f"**Slug:** {data.get('slug', '?')}\n"
+        f"**Description:** {data.get('description', '')}\n"
+        f"**URL:** {data.get('html_url', '?')}\n"
+        f"**Permissions:** {json.dumps(data.get('permissions', {}), indent=2)}"
+    )
+
+
+@tool(
+    name="list_app_installations",
+    description="List installations of the authenticated GitHub App.",
+    parameters={},
+    required=[],
+)
+def list_app_installations() -> str:
+    try:
+        data = _gh_json("api", "app/installations", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No installations."
+    lines = []
+    for i in data:
+        app_slug = i.get("app_slug", "?")
+        account = i.get("account", {}).get("login", "?")
+        target_type = i.get("target_type", "?")
+        repo_selection = i.get("repository_selection", "?")
+        lines.append(f"- **{app_slug}** on {account} ({target_type}, {repo_selection})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="create_commit",
+    description="Create a git commit object (low-level Git API).",
+    parameters={
+        "message": {
+            "type": "string",
+            "description": "Commit message.",
+        },
+        "tree_sha": {
+            "type": "string",
+            "description": "SHA of the tree for this commit.",
+        },
+        "parents": {
+            "type": "string",
+            "description": "Comma-separated parent commit SHAs.",
+        },
+        "author_name": {
+            "type": "string",
+            "description": "Author name (default: authenticated user).",
+        },
+        "author_email": {
+            "type": "string",
+            "description": "Author email.",
+        },
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=["message", "tree_sha"],
+)
+def create_commit(message: str, tree_sha: str, parents: str = "", author_name: str = "", author_email: str = "", repo: str = "") -> str:
+    repo = repo or _get_repo()
+    import json as j
+    payload: dict = {"message": message, "tree": tree_sha}
+    if parents:
+        payload["parents"] = [p.strip() for p in parents.split(",") if p.strip()]
+    if author_name or author_email:
+        author = {}
+        if author_name:
+            author["name"] = author_name
+        if author_email:
+            author["email"] = author_email
+        if author:
+            payload["author"] = author
+    try:
+        data = _gh_json("api", f"repos/{repo}/git/commits", "--method", "POST",
+                        "--raw-field", j.dumps(payload), timeout=15)
+        sha = data.get("sha", "?")
+        return f"Commit created: {sha[:7]}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="check_if_following",
+    description="Check if the authenticated user is following another user.",
+    parameters={
+        "username": {
+            "type": "string",
+            "description": "GitHub username to check.",
+        },
+    },
+    required=["username"],
+)
+def check_if_following(username: str) -> str:
+    try:
+        _gh("api", f"user/following/{username}", "--method", "GET", "--silent", timeout=15)
+        return f"✅ You are following **{username}**"
+    except RuntimeError as e:
+        return f"❌ You are not following **{username}**"
+
+
+@tool(
+    name="list_org_secrets",
+    description="List Dependabot secrets for an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+    },
+    required=["org"],
+)
+def list_org_secrets(org: str) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/dependabot/secrets", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    secrets = data.get("secrets", [])
+    if not secrets:
+        return "No Dependabot secrets for this org."
+    lines = []
+    for s in secrets:
+        created = s.get("created_at", "?")
+        visibility = s.get("visibility", "?")
+        lines.append(f"- `{s['name']}` (visibility: {visibility}, created: {created})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_repo_custom_properties",
+    description="Get custom property values for a repository.",
+    parameters={
+        "repo": {
+            "type": "string",
+            "description": "Repository in owner/repo format. Auto-detected if omitted.",
+        },
+    },
+    required=[],
+)
+def get_repo_custom_properties(repo: str = "") -> str:
+    repo = repo or _get_repo()
+    try:
+        data = _gh_json("api", f"repos/{repo}/properties/values", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No custom property values."
+    lines = []
+    for p in data:
+        prop_name = p.get("property_name", "?")
+        value = p.get("value", "?")
+        source = p.get("source_type", "?")
+        lines.append(f"- **{prop_name}**: {value} (source: {source})")
+    return "\n".join(lines)
+
+
+@tool(
+    name="get_org_teams",
+    description="List all teams in an organization.",
+    parameters={
+        "org": {
+            "type": "string",
+            "description": "Organization name.",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results (default 20).",
+        },
+    },
+    required=["org"],
+)
+def get_org_teams(org: str, limit: int = 20) -> str:
+    try:
+        data = _gh_json("api", f"orgs/{org}/teams?per_page={limit}", timeout=15)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    if not data:
+        return "No teams found."
+    lines = []
+    for t in data:
+        name = t.get("name", "?")
+        slug = t.get("slug", "?")
+        privacy = t.get("privacy", "?")
+        members = t.get("members_count", 0)
+        repos = t.get("repos_count", 0)
+        lines.append(f"- **{name}** (`{slug}`, {privacy}, {members} members, {repos} repos)")
+    return "\n".join(lines)
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
@@ -6905,8 +7633,26 @@ def list_tools(category: str = "") -> str:
             cat = "issues"
         elif any(name.startswith(p) for p in ("get_actions_billing",)):
             cat = "billing"
-        elif any(name.startswith(p) for p in ("list_repo_invitations",)):
+        elif any(name.startswith(p) for p in ("list_repo_invitations", "enable_vulnerability", "disable_vulnerability", "enable_automatic", "disable_automatic", "get_repo_interaction", "set_repo_interaction", "remove_repo_interaction", "get_repo_custom")):
             cat = "repo_management"
+        elif any(name.startswith(p) for p in ("list_org_webhook", "create_org_webhook", "delete_org_webhook")):
+            cat = "webhooks"
+        elif any(name.startswith(p) for p in ("check_org_membership", "get_org_membership", "get_org_teams", "list_org_secrets")):
+            cat = "organizations"
+        elif any(name.startswith(p) for p in ("set_team_membership", "remove_team_member")):
+            cat = "teams"
+        elif any(name.startswith(p) for p in ("generate_release_notes", "get_release")):
+            cat = "releases"
+        elif any(name.startswith(p) for p in ("trigger_workflow_with_inputs", "get_workflow_usage")):
+            cat = "workflows"
+        elif any(name.startswith(p) for p in ("list_merge_queue_entries",)):
+            cat = "merge_queue"
+        elif any(name.startswith(p) for p in ("get_app", "list_app_installations")):
+            cat = "apps"
+        elif any(name.startswith(p) for p in ("create_commit",)):
+            cat = "git"
+        elif any(name.startswith(p) for p in ("check_if_following",)):
+            cat = "users"
         elif any(name.startswith(p) for p in ("set_repo_secret", "delete_repo_secret", "set_repo_variable", "delete_repo_variable")):
             cat = "secrets_vars"
         elif any(name.startswith(p) for p in ("create_environment", "delete_environment")):

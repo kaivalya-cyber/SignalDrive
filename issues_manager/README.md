@@ -136,7 +136,27 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | File CRUD      | `create_or_update_file`, `delete_repo_file` |
 | Stats          | `get_weekly_commit_activity`, `get_code_frequency` |
 | Gist Comments  | `create_gist_comment`, `list_gist_comments` |
-| Other          | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `remove_issue_assignees`, `add_issue_labels`, `set_issue_labels`, `update_pr_branch`, `update_pull_request`, `list_pr_commits`, `list_pr_files`, `dismiss_pr_review`, `list_pr_reviews`, `list_commit_prs`, `remove_collaborator`, `get_workflow_logs`, `get_workflow_run`, `delete_workflow_run`, `get_commit`, `list_forks`, `list_reactions`, `delete_reaction`, `list_release_assets`, `upload_release_asset`, `get_release_by_tag`, `delete_release_asset`, `get_emojis`, `list_codes_of_conduct`, `get_license`, `list_commit_comments`, `create_commit_comment`, `list_tag_protection`, `get_repo_archive`, `create_gist_comment`, `list_gist_comments`, `get_deploy_key`, `get_webhook`, `update_webhook`, `create_autolink`, `delete_autolink` |
+| Teams          | `get_team`, `list_team_repos`, `set_team_membership`, `remove_team_member` |
+| Org Webhooks   | `list_org_webhooks`, `create_org_webhook`, `delete_org_webhook` |
+| Org Teams      | `get_org_teams` |
+| Org Shared     | `check_org_membership`, `get_org_membership`, `list_org_secrets` |
+| Merge Queue    | `list_merge_queue_entries` |
+| Interaction    | `get_repo_interaction_limits`, `set_repo_interaction_limits`, `remove_repo_interaction_limits` |
+| Security Toggle| `enable_vulnerability_alerts`, `disable_vulnerability_alerts`, `enable_automatic_security_fixes`, `disable_automatic_security_fixes` |
+| Custom Props   | `get_repo_custom_properties` |
+| GitHub Apps    | `get_app`, `list_app_installations` |
+| Release Notes  | `generate_release_notes` |
+| Workflow Inputs| `trigger_workflow_with_inputs` |
+| Workflow Usage | `get_workflow_usage` |
+| Git Low-Level  | `create_commit` |
+| Codespaces     | `list_codespaces` |
+| Billing        | `get_actions_billing` |
+| Invitations    | `list_repo_invitations` |
+| Git Data       | `get_blob`, `get_tree` |
+| File CRUD      | `create_or_update_file`, `delete_repo_file` |
+| Stats          | `get_weekly_commit_activity`, `get_code_frequency` |
+| Gist Comments  | `create_gist_comment`, `list_gist_comments` |
+| Other          | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `remove_issue_assignees`, `add_issue_labels`, `set_issue_labels`, `update_pr_branch`, `update_pull_request`, `list_pr_commits`, `list_pr_files`, `dismiss_pr_review`, `list_pr_reviews`, `list_commit_prs`, `remove_collaborator`, `get_workflow_logs`, `get_workflow_run`, `delete_workflow_run`, `get_commit`, `list_forks`, `list_reactions`, `delete_reaction`, `list_release_assets`, `upload_release_asset`, `get_release_by_tag`, `delete_release_asset`, `get_release`, `get_emojis`, `list_codes_of_conduct`, `get_license`, `list_commit_comments`, `create_commit_comment`, `list_tag_protection`, `get_repo_archive`, `create_gist_comment`, `list_gist_comments`, `get_deploy_key`, `get_webhook`, `update_webhook`, `create_autolink`, `delete_autolink`, `check_if_following`, `create_commit` |
 
 ## Architecture
 

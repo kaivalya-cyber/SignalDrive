@@ -186,6 +186,23 @@ Other:
 - list_commit_prs: Find PRs containing a commit
 - get_weekly_commit_activity / get_code_frequency: Repository statistics
 - create_gist_comment / list_gist_comments: Gist comments
+- list_org_webhooks / create_org_webhook / delete_org_webhook: Org webhooks
+- check_org_membership / get_org_membership: Org membership
+- set_team_membership / remove_team_member: Team membership management
+- get_org_teams: List org teams
+- list_org_secrets: Org Dependabot secrets
+- generate_release_notes: Auto-generate changelog
+- trigger_workflow_with_inputs: Workflow dispatch with custom inputs
+- enable/disable_vulnerability_alerts: Dependabot alerts toggle
+- enable/disable_automatic_security_fixes: Auto security fixes toggle
+- list_merge_queue_entries: Merge queue management
+- get/set/remove_repo_interaction_limits: Interaction limits
+- get_release: Get release by ID
+- get_workflow_usage: Workflow billable minutes
+- get_app / list_app_installations: GitHub App info
+- create_commit: Low-level git commit creation
+- check_if_following: Check follow status
+- get_repo_custom_properties: Custom property values
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.
