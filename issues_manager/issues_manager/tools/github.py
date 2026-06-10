@@ -10458,6 +10458,160 @@ def list_team_projects(org: str, team_slug: str) -> str:
 
 
 @tool(
+    name="get_gist",
+    description="Get a single gist by its ID.",
+    parameters={
+        "gist_id": {"type": "string", "description": "Gist ID"},
+    },
+    required=["gist_id"],
+)
+def get_gist(gist_id: str) -> str:
+    try:
+        return _gh("gist", "view", gist_id)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_gist",
+    description="Update a gist (replaces all content).",
+    parameters={
+        "gist_id": {"type": "string", "description": "Gist ID"},
+        "description": {"type": "string", "description": "New description"},
+        "add_file": {"type": "string", "description": "Path to file to add or update"},
+    },
+    required=["gist_id"],
+)
+def update_gist(gist_id: str, description: str = "", add_file: str = "") -> str:
+    try:
+        args = ["gist", "edit", gist_id]
+        if description:
+            args += ["--desc", description]
+        if add_file:
+            args += ["--add", add_file]
+        _gh(*args)
+        return f"Gist {gist_id} updated."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_gist",
+    description="Delete a gist by its ID.",
+    parameters={
+        "gist_id": {"type": "string", "description": "Gist ID"},
+    },
+    required=["gist_id"],
+)
+def delete_gist(gist_id: str) -> str:
+    try:
+        _gh("gist", "delete", gist_id, timeout=15)
+        return f"Gist {gist_id} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="fork_gist",
+    description="Fork a gist.",
+    parameters={
+        "gist_id": {"type": "string", "description": "Gist ID"},
+    },
+    required=["gist_id"],
+)
+def fork_gist(gist_id: str) -> str:
+    try:
+        return _gh("gist", "fork", gist_id)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="star_gist",
+    description="Star a gist.",
+    parameters={
+        "gist_id": {"type": "string", "description": "Gist ID"},
+    },
+    required=["gist_id"],
+)
+def star_gist(gist_id: str) -> str:
+    try:
+        _gh("api", f"gists/{gist_id}/star", "--method", "PUT", "--silent", timeout=15)
+        return f"Gist {gist_id} starred."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="unstar_gist",
+    description="Unstar a gist.",
+    parameters={
+        "gist_id": {"type": "string", "description": "Gist ID"},
+    },
+    required=["gist_id"],
+)
+def unstar_gist(gist_id: str) -> str:
+    try:
+        _gh("api", f"gists/{gist_id}/star", "--method", "DELETE", "--silent", timeout=15)
+        return f"Gist {gist_id} unstarred."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_webhook_deliveries",
+    description="List deliveries for a repository webhook.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "hook_id": {"type": "string", "description": "Webhook ID"},
+        "limit": {"type": "string", "description": "Max results (default: 10)"},
+    },
+    required=["repo", "hook_id"],
+)
+def list_webhook_deliveries(repo: str, hook_id: str, limit: str = "10") -> str:
+    try:
+        return _gh("api", f"repos/{repo}/hooks/{hook_id}/deliveries?per_page={limit}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_webhook_delivery",
+    description="Get a specific webhook delivery by ID.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "hook_id": {"type": "string", "description": "Webhook ID"},
+        "delivery_id": {"type": "string", "description": "Delivery ID"},
+    },
+    required=["repo", "hook_id", "delivery_id"],
+)
+def get_webhook_delivery(repo: str, hook_id: str, delivery_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/hooks/{hook_id}/deliveries/{delivery_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="redeliver_webhook_delivery",
+    description="Redeliver a webhook delivery.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "hook_id": {"type": "string", "description": "Webhook ID"},
+        "delivery_id": {"type": "string", "description": "Delivery ID"},
+    },
+    required=["repo", "hook_id", "delivery_id"],
+)
+def redeliver_webhook_delivery(repo: str, hook_id: str, delivery_id: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/hooks/{hook_id}/deliveries/{delivery_id}/attempts",
+            "--method", "POST", "--silent", timeout=15)
+        return f"Webhook delivery {delivery_id} redelivered."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
