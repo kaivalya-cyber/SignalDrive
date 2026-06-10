@@ -168,6 +168,24 @@ Other:
 - create_check_run: Create check runs on commits
 - list_tag_protection: Tag protection rules
 - get_pages_info: GitHub Pages site details
+- get_release_by_tag / delete_release_asset: Full release/asset management
+- update_pull_request: Edit PR title/body/state/base
+- list_pr_commits / list_pr_files / dismiss_pr_review: PR inspection and review management
+- add_issue_labels / set_issue_labels: Label management on issues
+- get_team / list_team_repos: Team info
+- create_commit_comment: Comment on a specific commit
+- create_or_update_file / delete_repo_file: Repo content CRUD
+- get_blob / get_tree: Git data objects
+- list_codespaces: User codespace listing
+- get_actions_billing: Actions billing usage
+- list_repo_invitations: Pending invitations
+- create_autolink / delete_autolink: Autolink CRUD
+- get_webhook / update_webhook: Webhook detail/edit
+- get_deploy_key: Individual deploy key details
+- list_pr_reviews: List reviews on a PR
+- list_commit_prs: Find PRs containing a commit
+- get_weekly_commit_activity / get_code_frequency: Repository statistics
+- create_gist_comment / list_gist_comments: Gist comments
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.
