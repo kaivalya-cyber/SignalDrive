@@ -100,14 +100,24 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Community       | `community_profile` |
 | Branch Protect  | `get_branch_protection` |
 | Licenses        | `list_licenses` |
-| Deploy Keys     | `list_deploy_keys`, `add_deploy_key` |
-| Secrets/Vars    | `list_repo_secrets`, `list_repo_variables` |
-| Artifacts       | `list_actions_artifacts` |
+| Deploy Keys     | `list_deploy_keys`, `add_deploy_key`, `delete_deploy_key` |
+| Secrets/Vars CRUD | `list_repo_secrets`, `set_repo_secret`, `delete_repo_secret`, `list_repo_variables`, `set_repo_variable`, `delete_repo_variable` |
+| Artifacts       | `list_actions_artifacts`, `delete_artifact` |
 | Issue Templates | `list_issue_templates` |
 | Template Repos  | `create_repo_from_template` |
 | Merge Options   | `set_repo_merge_options` |
+| Webhooks        | `list_webhooks`, `create_webhook`, `delete_webhook`, `ping_webhook` |
+| Environments    | `list_environments`, `create_environment`, `delete_environment` |
+| Deployments     | `list_deployments`, `create_deployment`, `list_deployment_statuses` |
+| Branches        | `list_branches`, `delete_branch`, `get_branch`, `get_branch_protection` |
+| Git Refs        | `create_git_ref`, `delete_git_ref` |
+| Releases Full   | `list_releases`, `create_release`, `update_release`, `delete_release`, `list_release_assets`, `upload_release_asset` |
+| Security Alerts | `list_code_scanning_alerts`, `update_code_scanning_alert`, `list_dependabot_alerts`, `update_dependabot_alert`, `list_secret_scanning_alerts`, `update_secret_scanning_alert` |
+| Reactions       | `add_reaction`, `list_reactions`, `delete_reaction` |
+| Commit Statuses | `create_commit_status`, `list_commit_statuses`, `get_combined_commit_status` |
+| Repo Content    | `get_repo_content` |
 | Meta            | `list_tools` |
-| Other           | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `remove_issue_assignees`, `update_pr_branch`, `remove_collaborator`, `get_workflow_logs` |
+| Other           | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `remove_issue_assignees`, `update_pr_branch`, `remove_collaborator`, `get_workflow_logs`, `get_workflow_run`, `delete_workflow_run`, `get_commit`, `list_forks`, `list_reactions`, `delete_reaction`, `list_release_assets`, `upload_release_asset` |
 
 ## Architecture
 
