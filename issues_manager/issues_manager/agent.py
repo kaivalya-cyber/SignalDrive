@@ -126,6 +126,15 @@ Other:
 - render_markdown: Render markdown to HTML (gfm mode)
 - watch_repo / unwatch_repo: Subscribe/unsubscribe to repo notifications
 - community_profile: Community health metrics and file status
+- list_deploy_keys / add_deploy_key: Manage SSH deploy keys
+- list_actions_artifacts: List workflow artifacts
+- list_repo_secrets / list_repo_variables: List secret/variable names
+- get_workflow_logs: Get workflow run log download URL
+- remove_issue_assignees: Remove assignees from an issue
+- set_repo_merge_options: Configure merge methods (merge/squash/rebase)
+- list_issue_templates: List available issue template files
+- create_repo_from_template: Generate repo from template
+- list_tools: List all available tools grouped by category
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.

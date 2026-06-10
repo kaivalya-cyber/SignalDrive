@@ -100,7 +100,14 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Community       | `community_profile` |
 | Branch Protect  | `get_branch_protection` |
 | Licenses        | `list_licenses` |
-| Other           | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `update_pr_branch`, `remove_collaborator` |
+| Deploy Keys     | `list_deploy_keys`, `add_deploy_key` |
+| Secrets/Vars    | `list_repo_secrets`, `list_repo_variables` |
+| Artifacts       | `list_actions_artifacts` |
+| Issue Templates | `list_issue_templates` |
+| Template Repos  | `create_repo_from_template` |
+| Merge Options   | `set_repo_merge_options` |
+| Meta            | `list_tools` |
+| Other           | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `remove_issue_assignees`, `update_pr_branch`, `remove_collaborator`, `get_workflow_logs` |
 
 ## Architecture
 
