@@ -151,6 +151,23 @@ Other:
 - list_reactions / delete_reaction: Reaction management
 - update_release / delete_release / list_release_assets / upload_release_asset: Full release lifecycle + assets
 - update_code_scanning_alert / update_dependabot_alert / update_secret_scanning_alert: Alert state management
+- list_orgs / get_org / list_org_members / list_org_repos: Organization operations
+- get_user / list_user_repos / list_followers / list_following / follow_user / unfollow_user: User operations
+- list_projects / create_project: Classic project boards
+- list_actions_caches / delete_actions_caches: Actions cache management
+- list_runners: Self-hosted runners
+- list_rulesets: Repository rulesets
+- list_autolinks: Autolink references
+- list_commit_comments: Comments on commits
+- get_emojis: GitHub emoji reference
+- list_codes_of_conduct: Code of conduct templates
+- list_gitignore_templates / get_gitignore_template: .gitignore templates
+- get_license: Individual license template details
+- get_repo_archive: Archive download URL
+- get_dependency_sbom: Dependency SBOM (SPDX)
+- create_check_run: Create check runs on commits
+- list_tag_protection: Tag protection rules
+- get_pages_info: GitHub Pages site details
 
 Guidelines:
 1. When listing, default to open/20 unless specified otherwise.

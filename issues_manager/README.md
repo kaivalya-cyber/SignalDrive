@@ -116,8 +116,19 @@ Override the model: `GH_MANAGER_MODEL=gpt-4o-mini`
 | Reactions       | `add_reaction`, `list_reactions`, `delete_reaction` |
 | Commit Statuses | `create_commit_status`, `list_commit_statuses`, `get_combined_commit_status` |
 | Repo Content    | `get_repo_content` |
-| Meta            | `list_tools` |
-| Other           | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `remove_issue_assignees`, `update_pr_branch`, `remove_collaborator`, `get_workflow_logs`, `get_workflow_run`, `delete_workflow_run`, `get_commit`, `list_forks`, `list_reactions`, `delete_reaction`, `list_release_assets`, `upload_release_asset` |
+| Orgs           | `list_orgs`, `get_org`, `list_org_members`, `list_org_repos` |
+| Users          | `get_user`, `list_user_repos`, `list_followers`, `list_following`, `follow_user`, `unfollow_user` |
+| Projects       | `list_projects`, `create_project` |
+| Caches         | `list_actions_caches`, `delete_actions_caches` |
+| Runners        | `list_runners` |
+| Rulesets       | `list_rulesets` |
+| Autolinks      | `list_autolinks` |
+| Check Runs     | `create_check_run` |
+| Pages          | `get_pages_info` |
+| SBOM           | `get_dependency_sbom` |
+| Gitignore      | `list_gitignore_templates`, `get_gitignore_template` |
+| Meta           | `list_tools` |
+| Other          | `transfer_issue`, `set_issue_priority`, `set_issue_milestone`, `remove_issue_labels`, `remove_issue_assignees`, `update_pr_branch`, `remove_collaborator`, `get_workflow_logs`, `get_workflow_run`, `delete_workflow_run`, `get_commit`, `list_forks`, `list_reactions`, `delete_reaction`, `list_release_assets`, `upload_release_asset`, `get_emojis`, `list_codes_of_conduct`, `get_license`, `list_commit_comments`, `list_tag_protection`, `get_repo_archive` |
 
 ## Architecture
 
