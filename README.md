@@ -16,7 +16,8 @@
 
 ![Demo](assets/demo.gif)
 
-> Switch between 2D top-down and 3D follow-camera modes by changing `RENDER_MODE` in `config.py`
+> Switch between 2D top-down and 3D follow-camera modes by changing `RENDER_MODE` in `config.py`.
+> On low-end machines, set `RENDER_QUALITY = "low"` to render 3D at 320×240 with frame-skipping.
 
 ---
 
@@ -28,7 +29,7 @@ What makes this project technically distinct is its **asymmetric two-hand contro
 
 Two failure modes common in gesture systems are solved here by design. **Flickering commands** — where transient landmark noise triggers false gesture transitions — are eliminated by temporal smoothing: a gesture must be held consistently for `GESTURE_HOLD_FRAMES` (5) consecutive frames before it is emitted as a confirmed command. **Steering jerking** — where abrupt angle changes feel unnatural — is smoothed by a PID controller applied to steering transitions, configurable via `PID_KP`, `PID_KI`, `PID_KD` in `config.py`.
 
-The HUD is a professional six-panel F1 telemetry overlay: real-time graphs of speed, steering angle, and throttle; a top-down minimap with a compass rose and heading triangle; a live webcam picture-in-picture with MediaPipe landmark skeleton; and a full-width status bar with a steering position indicator and speed arc gauge. The rendering backend is switchable between a 3D PyBullet follow camera and a pure OpenCV 2D top-down renderer — the latter achieves ~28 FPS on Apple Silicon vs ~0.8 FPS for the naive 3D renderer, making the 2D mode the recommended default.
+The HUD is a professional six-panel F1 telemetry overlay: real-time graphs of speed, steering angle, and throttle; a top-down minimap with a compass rose and heading triangle; a live webcam picture-in-picture with MediaPipe landmark skeleton; and a full-width status bar with a steering position indicator and speed arc gauge. The rendering backend is switchable between a 3D PyBullet follow camera and a pure OpenCV 2D top-down renderer — the latter achieves ~28 FPS on Apple Silicon vs ~0.8 FPS for the naive 3D renderer, making the 2D mode the recommended default. For low-end machines, the 3D renderer also supports three quality tiers (`RENDER_QUALITY` in `config.py`) that slash pixel count and optionally skip every other frame.
 
 ---
 
@@ -78,9 +79,10 @@ OpenCV Window ← HUD Overlay ← TopDownRenderer / PyBullet Camera ← Telemetr
 ![FPS Comparison](assets/fps_comparison.png)
 
 | Mode | Avg FPS | Render Time | CPU Usage | Notes |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | 3D PyBullet (1280×720) | 0.8 | ~1200ms | 95% | Bottlenecked by ER_TINY_RENDERER |
-| 3D PyBullet (320×240 → upscaled) | 15.4 | ~60ms | 70% | Acceptable for demo |
+| 3D PyBullet (320×240 → upscaled) | 15.4 | ~60ms | 70% | `RENDER_QUALITY = "medium"` |
+| 3D PyBullet (320×240, skip=1) | ~26 | ~30ms | 45% | `RENDER_QUALITY = "low"` — frame-skipping |
 | 2D OpenCV Top-Down | ~28 | ~3ms | 35% | **Recommended mode** |
 
 ### MediaPipe Latency
@@ -114,13 +116,14 @@ OpenCV Window ← HUD Overlay ← TopDownRenderer / PyBullet Camera ← Telemetr
 ### System Requirements
 
 | Component | Minimum | Tested On |
-|---|---|---|
+|---|---|---|---|
 | Python | 3.8 | 3.11 (conda) |
 | RAM | 4 GB | 16 GB |
 | CPU | Any modern | Apple M4 |
 | GPU | Not required | Not required |
 | Webcam | 720p | Built-in FaceTime + iPhone Continuity |
 | OS | macOS / Linux | macOS 15 |
+| 3D Quality | "low" for ≤4 cores | "high" on Apple Silicon |
 
 ---
 
@@ -194,6 +197,7 @@ All tunable parameters live in `config.py`. To toggle between render modes, edit
 | Constant | Default | Type | Description |
 |---|---|---|---|
 | `RENDER_MODE` | `"2D"` | str | `"2D"` for OpenCV top-down, `"3D"` for PyBullet camera |
+| `RENDER_QUALITY` | `"high"` | str | 3D render cost: `"high"` (640×480, every frame), `"medium"` (320×240, every frame), `"low"` (320×240, every 2nd frame) |
 | `CAMERA_WIDTH` | `1280` | int | Output frame width in pixels |
 | `CAMERA_HEIGHT` | `720` | int | Output frame height in pixels |
 | `TARGET_FPS` | `30` | int | Target frame rate (used for interval timing) |
@@ -215,7 +219,7 @@ All tunable parameters live in `config.py`. To toggle between render modes, edit
 
 ## Known Issues
 
-- **PyBullet 3D mode is bottlenecked on Apple Silicon.** `ER_TINY_RENDERER` runs entirely on CPU — it does not use Metal or GPU acceleration. At full 1280×720, expect ~0.8 FPS. Use `RENDER_MODE = "2D"` for smooth performance; or set the internal render resolution to 640×480 in `car_sim.py` for ~15 FPS in 3D mode.
+- **PyBullet 3D mode is bottlenecked on Apple Silicon.** `ER_TINY_RENDERER` runs entirely on CPU — it does not use Metal or GPU acceleration. At full 1280×720, expect ~0.8 FPS. Use `RENDER_MODE = "2D"` for smooth performance; or set `RENDER_QUALITY = "low"` in `config.py` to render at 320×240 with frame-skipping for a ~8× speedup.
 
 - **MediaPipe handedness is mirrored on front-facing webcams.** When MediaPipe reports `"Right"`, it means the hand's own physical right hand — which appears on the *left* side of a mirrored webcam image. The code uses MediaPipe's label directly without inversion, which is correct. If your control feels backwards, check lighting and hand orientation rather than swapping labels.
 
