@@ -240,6 +240,505 @@ All tunable parameters live in `config.py`. To toggle between render modes, edit
 
 ---
 
+## GitHub Issues Manager
+
+This repo includes a **standalone GitHub Issues Manager AI agent** (`issues_manager/`) that manages GitHub issues, PRs, and all GitHub REST API resources via any LLM provider (OpenAI, Anthropic, NVIDIA NIM, OpenRouter, Together, Groq, DeepSeek). It wraps the `gh` CLI for authentication and exposes **405 tools** across the entire GitHub API surface.
+
+### Quick Start
+
+```bash
+cd issues_manager
+pip install -e .
+export PROVIDER=openai  # or anthropic, openrouter, nvidia, together, groq, deepseek
+export OPENAI_API_KEY=sk-...
+issues-manager "Show me open issues in this repo"
+```
+
+### Tool Inventory
+
+#### Issues
+- `add_issue_assignees`: Add assignees to a GitHub issue.
+- `add_issue_labels`: Add labels to an issue without removing existing ones.
+- `add_reaction`: Add a reaction to an issue, PR, or comment.
+- `close_issue`: Close a GitHub issue.
+- `comment_on_issue`: Add a comment to an existing GitHub issue.
+- `copy_issue_to_repo`: Copy an issue to another repository.
+- `create_issue`: Create a new GitHub issue.
+- `create_issue_comment`: Create a comment on an issue. Alias for comment_on_issue.
+- `create_sub_issue`: Create a sub-issue on an issue.
+- `delete_reaction`: Delete a reaction (by the authenticated user).
+- `edit_issue`: Edit a GitHub issue: update title, body, add/remove labels, add/remove assignees.
+- `get_issue_timeline`: Get the full timeline of an issue including cross-references.
+- `list_issue_comments`: List all comments on an issue or pull request.
+- `list_issue_events`: List timeline events for an issue.
+- `list_issue_labels_for_milestone`: List labels for every issue in a milestone.
+- `list_issue_templates`: List available issue templates for a repository.
+- `list_issues`: List GitHub issues with optional filters.
+- `list_sub_issues`: List sub-issues for a parent issue.
+- `lock_issue`: Lock conversation on an issue or pull request.
+- `pin_issue`: Pin an issue or pull request to the repository overview page.
+- `remove_issue_assignees`: Remove specific assignees from an issue or pull request.
+- `remove_issue_labels`: Remove specific labels from an issue or pull request.
+- `reopen_issue`: Reopen a closed GitHub issue.
+- `search_issues`: Search GitHub issues across repositories using full-text search.
+- `set_issue_labels`: Replace all labels on an issue.
+- `set_issue_milestone`: Assign an issue or PR to a milestone.
+- `set_issue_priority`: Set priority on an issue by adding a priority label.
+- `transfer_issue`: Transfer an issue to another repository.
+- `unlock_issue`: Unlock conversation on an issue or pull request.
+- `unpin_issue`: Unpin an issue or pull request from the repository overview.
+- `view_issue`: View full details of a specific GitHub issue.
+
+#### Pull Requests
+- `add_pr_review`: Submit a review on a pull request (approve, comment, or request changes).
+- `create_pull_request`: Create a pull request from the current branch or specified head branch.
+- `disable_auto_merge`: Disable auto-merge on a pull request.
+- `dismiss_pr_review`: Dismiss a PR review.
+- `enable_auto_merge`: Enable auto-merge on a pull request with a specific merge method.
+- `get_pr_diff`: Get the diff content of a pull request.
+- `list_pr_checks`: List all check runs / CI status for a pull request.
+- `list_pr_commits`: List commits in a pull request.
+- `list_pr_files`: List files changed in a pull request.
+- `list_pr_review_comments`: List inline review comments on a pull request.
+- `list_pr_reviews`: List reviews on a pull request.
+- `list_pull_requests`: List GitHub pull requests with optional filters.
+- `list_pull_review_requests`: List requested reviewers on a pull request.
+- `merge_pull_request`: Merge a GitHub pull request.
+- `request_pr_reviewers`: Request reviews from specific users on a pull request.
+- `update_pr_branch`: Update a pull request branch with the latest changes from the base branch.
+- `update_pull_request`: Update a pull request (title, body, state, base branch).
+- `view_pull_request`: View full details of a specific GitHub pull request.
+
+#### Labels
+- `create_label`: Create a new label in a repository.
+- `delete_label`: Delete a label from a repository.
+- `get_label`: Get a specific label by name.
+- `list_labels`: List all labels in a repository.
+- `search_labels`: Search for labels in a repository.
+- `update_label`: Update a label's name, color, or description.
+
+#### Milestones
+- `create_milestone`: Create a milestone in a repository.
+- `delete_milestone`: Delete a milestone.
+- `get_milestone`: Get a specific milestone.
+- `list_milestones`: List milestones in a repository.
+- `set_issue_milestone`: Assign an issue or PR to a milestone.
+- `update_milestone`: Update a milestone.
+
+#### Releases
+- `create_release`: Create a new release in a repository.
+- `delete_release`: Delete a release.
+- `delete_release_asset`: Delete a release asset.
+- `generate_release_notes`: Generate release notes from a git tag or commit range.
+- `get_latest_release`: Get the latest published release for a repository.
+- `get_release`: Get a specific release by ID.
+- `get_release_by_tag`: Get a release by tag name.
+- `list_release_assets`: List assets for a release.
+- `list_releases`: List releases in a repository.
+- `update_release`: Update a release.
+- `upload_release_asset`: Upload a release asset file.
+
+#### Actions / Workflows
+- `approve_workflow_run`: Approve a workflow run that requires approval.
+- `cancel_workflow_run`: Cancel a running GitHub Actions workflow run.
+- `delete_workflow_run`: Delete a specific workflow run.
+- `download_workflow_run_job_logs`: Download logs for a specific workflow run job.
+- `get_actions_permissions`: Get GitHub Actions permissions for a repository.
+- `get_code_scanning_default_setup`: Get the code scanning default setup configuration.
+- `get_workflow`: Get a single workflow by filename or ID.
+- `get_workflow_dispatch_inputs`: Get the input schema for a workflow that supports workflow_dispatch.
+- `get_workflow_logs`: Get the download URL for workflow run logs.
+- `get_workflow_run`: Get detailed information about a specific workflow run.
+- `get_workflow_run_job`: Get details of a specific job in a workflow run.
+- `get_workflow_usage`: Get workflow usage statistics (billable minutes).
+- `list_workflow_run_jobs`: List jobs for a workflow run.
+- `list_workflow_runs`: List recent GitHub Actions workflow runs.
+- `list_workflow_runs_for_workflow`: List workflow runs for a specific workflow.
+- `list_workflows`: List all GitHub Actions workflow files in a repository.
+- `rerun_workflow`: Rerun a failed or cancelled workflow run.
+- `rerun_workflow_failed_jobs`: Rerun only the failed jobs in a workflow run.
+- `set_actions_permissions`: Set GitHub Actions permissions for a repository.
+- `trigger_workflow`: Trigger (dispatch) a GitHub Actions workflow by filename.
+- `trigger_workflow_with_inputs`: Trigger a workflow dispatch event with custom inputs.
+- `update_code_scanning_default_setup`: Update the code scanning default setup configuration.
+
+#### Actions / Runners & Artifacts
+- `create_registration_token`: Create a registration token for adding a new self-hosted runner.
+- `create_remove_token`: Create a remove token for removing a self-hosted runner.
+- `delete_actions_caches`: Delete GitHub Actions caches by key or ref.
+- `delete_artifact`: Delete a specific workflow artifact.
+- `get_runner`: Get details of a specific self-hosted runner.
+- `list_actions_artifacts`: List GitHub Actions artifacts for a repository.
+- `list_actions_caches`: List GitHub Actions caches for a repository.
+- `list_runner_applications`: List runner applications available for download.
+- `list_runner_groups`: List self-hosted runner groups for a repository.
+- `list_runners`: List self-hosted runners for a repository.
+- `remove_runner`: Remove a self-hosted runner from a repository.
+
+#### Actions / OIDC
+- `get_oidc_subject_claims_customization`: Get the OIDC subject claim customization for an organization.
+- `update_oidc_subject_claims_customization`: Update the OIDC subject claim customization for an organization.
+
+#### Webhooks
+- `create_org_webhook`: Create a webhook for an organization.
+- `create_webhook`: Create a repository webhook.
+- `delete_org_webhook`: Delete an organization webhook.
+- `delete_webhook`: Delete a repository webhook.
+- `get_org_hook`: Get a single organization webhook by ID.
+- `get_webhook`: Get a single webhook configuration.
+- `get_webhook_delivery`: Get a specific webhook delivery by ID.
+- `list_org_webhooks`: List webhooks for an organization.
+- `list_webhook_deliveries`: List deliveries for a repository webhook.
+- `list_webhooks`: List webhooks configured on a repository.
+- `ping_org_webhook`: Ping an organization webhook to trigger a test delivery.
+- `ping_webhook`: Send a ping event to a repository webhook.
+- `redeliver_webhook_delivery`: Redeliver a webhook delivery.
+- `update_org_webhook`: Update an organization webhook.
+- `update_webhook`: Update a webhook configuration.
+
+#### Environments
+- `create_environment`: Create or update a deployment environment.
+- `create_environment_secret`: Create or update a secret in an environment.
+- `create_environment_variable`: Create or update a variable in an environment.
+- `create_or_update_repo_environment`: Create or update a repository environment.
+- `delete_environment`: Delete a deployment environment.
+- `delete_environment_secret`: Delete a secret from an environment.
+- `delete_environment_variable`: Delete a variable from an environment.
+- `delete_repo_environment`: Delete a repository environment.
+- `get_environment`: Get a single deployment environment.
+- `get_environment_secret`: Get a single environment-level secret.
+- `get_repo_environment`: Get a repository environment (single).
+- `list_environment_secrets`: List secrets for a deployment environment.
+
+#### Deployments
+- `create_deployment`: Create a deployment.
+- `create_deployment_status`: Create a deployment status for a deployment.
+- `get_deployment`: Get a specific deployment by ID.
+- `get_deployment_status`: Get a specific deployment status by ID.
+- `list_deployment_statuses`: List statuses for a deployment.
+
+#### Secrets & Variables
+- `delete_repo_secret`: Delete an Actions secret from a repository.
+- `delete_repo_variable`: Delete an Actions variable from a repository.
+- `list_org_secret_scanning_alerts`: List secret scanning alerts for an organization.
+- `list_org_secrets`: List Dependabot secrets for an organization.
+- `list_repo_secrets`: List names of secrets configured in a repository.
+- `list_repo_variables`: List names of variables configured in a repository.
+- `set_repo_secret`: Create or update an Actions secret in a repository.
+- `set_repo_variable`: Create or update an Actions variable in a repository.
+
+#### Dependabot
+- `update_dependabot_alert`: Update the status of a Dependabot alert.
+- `list_dependabot_alerts`: List Dependabot security alerts for a repository.
+- `list_org_dependabot_alerts`: List Dependabot alerts for an organization.
+- `get_dependabot_alert`: Get a single Dependabot alert by number.
+
+#### Code Scanning
+- `list_code_scanning_alerts`: List Code Scanning security alerts for a repository.
+- `list_code_scanning_analyses`: List code scanning analyses for a repository.
+- `list_org_code_scanning_alerts`: List code scanning alerts for an organization.
+- `get_code_scanning_alert`: Get a single code scanning alert by number.
+- `update_code_scanning_alert`: Update the status of a code scanning alert.
+- `upload_sarif`: Upload a SARIF file from code scanning analysis.
+- `delete_code_scanning_analysis`: Delete a code scanning analysis from a repository.
+
+#### Secret Scanning
+- `list_secret_scanning_alerts`: List Secret Scanning alerts for a repository.
+- `list_org_secret_scanning_alerts`: List secret scanning alerts for an organization.
+- `list_secret_scanning_locations`: List locations for a secret scanning alert.
+- `get_secret_scanning_alert`: Get a single secret scanning alert by number.
+- `update_secret_scanning_alert`: Update the status of a secret scanning alert.
+
+#### Vulnerability Management
+- `disable_automatic_security_fixes`: Disable automatic security fixes for a repository.
+- `disable_private_vulnerability_reporting`: Disable private vulnerability reporting.
+- `disable_vulnerability_alerts`: Disable Dependabot vulnerability alerts.
+- `enable_automatic_security_fixes`: Enable automatic security fixes for a repository.
+- `enable_private_vulnerability_reporting`: Enable private vulnerability reporting.
+- `enable_vulnerability_alerts`: Enable Dependabot vulnerability alerts.
+- `get_dependency_diff`: Get a dependency diff between two refs.
+- `get_dependency_sbom`: Get the dependency SBOM for a repository.
+- `get_vulnerability_alerts`: Check if vulnerability alerts are enabled.
+
+#### Organizations
+- `block_org_user`: Block a user from an organization.
+- `check_org_membership`: Check if a user is a member of an organization.
+- `check_org_public_membership`: Check if a user is a public member of an organization.
+- `get_org`: Get details about an organization.
+- `get_org_audit_log`: Get the audit log for an organization.
+- `get_org_blocked_users`: List users blocked from an organization.
+- `get_org_membership`: Get organization membership details for a user.
+- `get_org_outside_collaborators`: List outside collaborators for an organization.
+- `get_org_security_managers`: List teams with security manager role in an organization.
+- `get_org_teams`: List all teams in an organization.
+- `list_org_custom_roles`: List custom repository roles for an organization.
+- `list_org_invitations`: List pending invitations for an organization.
+- `list_org_members`: List members of an organization.
+- `list_org_public_members`: List public members of an organization.
+- `list_org_repos`: List repositories in an organization.
+- `list_orgs`: List organizations for the authenticated user.
+- `remove_org_membership`: Remove a user from an organization.
+- `set_org_membership`: Set organization membership for a user.
+- `unblock_org_user`: Unblock a user from an organization.
+
+#### Teams
+- `add_team_repo`: Add a repository to a team.
+- `create_team`: Create a new team in an organization.
+- `delete_team`: Delete a team from an organization.
+- `get_team`: Get team information from an organization.
+- `get_team_discussions`: List discussions for a team.
+- `get_team_membership`: Get team membership for a user.
+- `list_team_members`: List members of a team.
+- `list_team_projects`: List projects associated with a team.
+- `list_team_repos`: List repositories a team has access to.
+- `remove_team_member`: Remove a user from a team.
+- `remove_team_repo`: Remove a repository from a team.
+- `set_team_membership`: Add or update a user's role on a team.
+- `update_team`: Update a team's settings in an organization.
+
+#### Users
+- `add_user_email`: Add an email address to the authenticated user's account.
+- `check_if_following`: Check if the authenticated user is following another user.
+- `delete_user_email`: Delete an email address from the authenticated user's account.
+- `follow_user`: Follow a GitHub user.
+- `get_user`: Get a GitHub user's public profile.
+- `list_followers`: List followers of a user.
+- `list_following`: List who a user is following.
+- `list_user_emails`: List email addresses for the authenticated user.
+- `list_user_gpg_keys`: List GPG keys for the authenticated user.
+- `list_user_repos`: List repositories for a user.
+- `list_user_ssh_keys`: List SSH keys for the authenticated user.
+- `unfollow_user`: Unfollow a GitHub user.
+- `whoami`: Show the currently authenticated GitHub user.
+
+#### Codespaces
+- `create_codespace`: Create a codespace for a repository.
+- `get_codespace`: Get details of a codespace.
+- `delete_codespace`: Delete a codespace.
+- `list_codespaces`: List codespaces for the authenticated user.
+- `start_codespace`: Start a codespace.
+- `stop_codespace`: Stop a running codespace.
+
+#### Packages
+- `get_package`: Get details of a package in an organization.
+- `list_packages`: List packages in a repository or for a user/org.
+- `list_package_versions`: List versions for a package.
+- `get_package_version`: Get details of a specific package version.
+- `delete_package`: Delete a package (version).
+- `delete_package_version`: Delete a specific version of a package.
+- `restore_package`: Restore a deleted package.
+- `restore_package_version`: Restore a specific deleted package version.
+
+#### Repository Management
+- `add_collaborator`: Add a collaborator to a repository.
+- `add_repo_topic`: Add topics to a repository.
+- `archive_repo`: Archive a repository.
+- `change_repo_visibility`: Change repository visibility.
+- `check_collaborator`: Check if a user is a collaborator on a repository.
+- `check_starred`: Check if the authenticated user has starred a repository.
+- `check_watching`: Check if the authenticated user is watching a repository.
+- `create_autolink`: Create an autolink reference for a repository.
+- `create_or_update_file`: Create or update a file in the repository.
+- `create_repo`: Create a new repository on GitHub.
+- `create_repo_from_template`: Create a repository from a template repository.
+- `create_repository_dispatch`: Create a repository dispatch event.
+- `create_ruleset`: Create a repository ruleset.
+- `delete_autolink`: Delete an autolink reference from a repository.
+- `delete_branch`: Delete a branch from the repository.
+- `delete_branch_protection`: Delete branch protection for a branch.
+- `delete_deploy_key`: Delete a deploy key from a repository.
+- `delete_repo_file`: Delete a file from the repository.
+- `delete_repo_invitation`: Cancel a repository invitation.
+- `delete_ruleset`: Delete a repository ruleset.
+- `fork_repo`: Fork a repository to your account or an organization.
+- `get_all_repo_topics`: Get all topics for a repository.
+- `get_branch`: Get a single branch with protection and commit info.
+- `get_branch_protection`: Get branch protection rules for a branch.
+- `get_deploy_key`: Get a single deploy key by ID.
+- `get_merge_queue_config`: Get the merge queue configuration for a repository.
+- `get_pages_info`: Get GitHub Pages site information for a repository.
+- `get_repo_archive`: Get the download URL for a repository archive.
+- `get_repo_code_of_conduct`: Get the code of conduct for a repository.
+- `get_repo_collaborator_permission`: Get the permission level for a collaborator.
+- `get_repo_content`: Get the content of a file or directory from a repository.
+- `get_repo_custom_properties`: Get custom property values for a repository.
+- `get_repo_info`: Get repository metadata, stats, and health overview.
+- `get_repo_interaction_limits`: Get interaction limits for a repository.
+- `get_repo_license`: Get the license content for a repository.
+- `get_repo_license_content`: Get the full license contents for a repository.
+- `get_repo_ruleset`: Get a single ruleset for a repository.
+- `get_repo_security_advisories`: List repository security advisories.
+- `get_ruleset`: Get a specific ruleset by ID.
+- `list_autolinks`: List autolink references for a repository.
+- `list_branches`: List branches in the repository.
+- `list_branches_for_head_commit`: List branches that contain a specific commit SHA.
+- `list_collaborators`: List collaborators on a repository.
+- `list_contributors`: List contributors to a repository.
+- `list_deploy_keys`: List deploy keys on a repository.
+- `list_deployments`: List deployments for a repository.
+- `list_environments`: List deployment environments for a repository.
+- `list_forks`: List forks of a repository.
+- `list_merge_queue_entries`: List entries in the merge queue for a repository.
+- `list_pages_builds`: List GitHub Pages builds for a repository.
+- `list_repo_custom_properties`: List custom property values for a repository.
+- `list_repo_invitations`: List invitations to a repository.
+- `list_repo_languages`: Get the programming language breakdown for a repository.
+- `list_repo_topics`: List all topics on a repository.
+- `list_rulesets`: List repository rulesets.
+- `remove_collaborator`: Remove a collaborator from a repository.
+- `remove_repo_interaction_limits`: Remove interaction limits for a repository.
+- `rename_branch`: Rename a branch in a repository.
+- `replace_all_repo_topics`: Replace all topics on a repository.
+- `request_pages_build`: Request a GitHub Pages build for a repository.
+- `set_collaborator_permission`: Set the permission level for a collaborator.
+- `set_repo_custom_properties`: Set custom property values for a repository.
+- `set_repo_interaction_limits`: Set interaction limits for a repository.
+- `set_repo_merge_options`: Configure which merge methods are allowed on a repository.
+- `set_repo_topics`: Set repository topics (replaces existing).
+- `star_repo`: Star a repository for the authenticated user.
+- `transfer_repo`: Transfer a repository to another user or organization.
+- `unarchive_repo`: Unarchive a previously archived repository.
+- `unstar_repo`: Unstar a repository.
+- `unwatch_repo`: Unsubscribe from notifications for a repository.
+- `update_branch_protection`: Update branch protection rules.
+- `update_ruleset`: Update a repository ruleset.
+- `watch_repo`: Subscribe to notifications for a repository.
+
+#### Git Data
+- `compare_refs`: Compare two git references in a repository.
+- `create_blob`: Create a git blob and return its SHA.
+- `create_commit`: Create a git commit object (low-level Git API).
+- `create_commit_comment`: Create a comment on a commit.
+- `create_commit_status`: Set a commit status on a specific commit SHA.
+- `create_git_ref`: Create a git reference (branch or tag).
+- `create_git_tag`: Create an annotated git tag object.
+- `create_tag_protection`: Create a tag protection rule for a repository.
+- `create_tree`: Create a git tree object from a list of paths/SHAs.
+- `delete_git_ref`: Delete a git reference.
+- `delete_tag_protection`: Delete a tag protection rule.
+- `get_blob`: Get a git blob (file content) by SHA.
+- `get_combined_commit_status`: Get the combined commit status for a given reference.
+- `get_commit`: Get a single commit by SHA with details.
+- `get_commit_comment`: Get a specific commit comment by ID.
+- `get_git_tag`: Get an annotated git tag object by SHA.
+- `get_tree`: Get a git tree by SHA with file listing.
+- `list_commit_comments`: List comments on a commit.
+- `list_commit_prs`: List pull requests that contain a specific commit.
+- `list_commit_statuses`: List commit statuses for a given reference.
+- `list_commits`: List commits on a branch with author, SHA, and message.
+- `list_matching_refs`: List matching git refs.
+- `list_tag_protection`: List tag protection rules for a repository.
+- `list_tags`: List tags in a repository.
+
+#### Checks & Suites
+- `create_check_run`: Create a check run on a commit.
+- `create_check_suite`: Create a check suite for a commit SHA.
+- `get_check_suite`: Get a single check suite by its ID.
+- `list_check_runs_for_ref`: List check runs for a commit SHA.
+- `list_check_suite_annotations`: List annotations for a check run.
+- `rerequest_check_suite`: Re-request a check suite (re-run checks).
+- `update_check_run`: Update a check run's output, status, or conclusion.
+
+#### Projects (Classic)
+- `create_project`: Create a project board in a repository.
+- `create_project_card`: Create a card in a project column.
+- `delete_project`: Delete a project.
+- `get_project`: Get a project by its ID.
+- `list_project_columns`: List columns in a project.
+- `list_projects`: List project boards in a repository.
+- `move_project_card`: Move a card within a project column.
+- `update_project`: Update a project.
+
+#### Comments
+- `delete_comment`: Delete a comment on an issue or pull request.
+- `delete_commit_comment`: Delete a commit comment.
+- `delete_review_comment`: Delete a pull request review comment.
+- `get_comment`: Get a specific comment by its ID.
+- `update_comment`: Edit an existing comment on an issue or pull request.
+- `update_commit_comment`: Update a commit comment.
+- `update_review_comment`: Update a pull request review comment.
+- `list_issue_comments`: List all comments on an issue or pull request.
+
+#### Gists
+- `create_gist`: Create a new gist with the given files.
+- `create_gist_comment`: Add a comment to a gist.
+- `delete_gist`: Delete a gist by its ID.
+- `fork_gist`: Fork a gist.
+- `get_gist`: Get a single gist by its ID.
+- `list_gist_comments`: List comments on a gist.
+- `list_gists`: List gists for the authenticated user.
+- `star_gist`: Star a gist.
+- `unstar_gist`: Unstar a gist.
+- `update_gist`: Update a gist (replaces all content).
+
+#### Notifications
+- `get_notification_thread`: Get a single notification thread.
+- `list_notifications`: List unread GitHub notifications.
+- `mark_notifications_read`: Mark all notifications as read.
+- `mark_thread_done`: Mark a notification thread as done.
+- `set_thread_subscription`: Set notification thread subscription.
+
+#### Search
+- `search_code`: Search code within a repository.
+- `search_commits`: Search for commits with a query.
+- `search_issues`: Search GitHub issues across repositories.
+- `search_labels`: Search for labels in a repository.
+- `search_repos`: Search GitHub repositories by query.
+- `search_topics`: Search for topics on GitHub.
+- `search_users`: Search GitHub users by query.
+
+#### Deploy Keys
+- `add_deploy_key`: Add a deploy key to a repository.
+- `delete_deploy_key`: Delete a deploy key from a repository.
+- `get_deploy_key`: Get a single deploy key by ID.
+- `list_deploy_keys`: List deploy keys on a repository.
+
+#### Billing & Copilot
+- `assign_copilot_seat`: Assign a Copilot seat to a user in an organization.
+- `get_actions_billing`: Get GitHub Actions billing for a repository or organization.
+- `get_copilot_billing`: Get Copilot billing and seat information for an organization.
+- `get_enterprise_billing`: Get GitHub Actions billing for an enterprise.
+- `list_copilot_seats`: List Copilot seats assigned in an organization.
+- `remove_copilot_seat`: Remove a Copilot seat from a user in an organization.
+
+#### Enterprise
+- `get_audit_log`: Get the audit log for an organization.
+- `get_enterprise_audit_log`: Get the audit log for an enterprise.
+- `get_enterprise_consumed_licenses`: Get consumed licenses for an enterprise.
+
+#### GitHub Pages
+- `get_pages_info`: Get GitHub Pages site information for a repository.
+- `list_pages_builds`: List GitHub Pages builds for a repository.
+- `request_pages_build`: Request a GitHub Pages build for a repository.
+
+#### Utilities
+- `community_profile`: Get the community health metrics for a repository.
+- `get_code_frequency`: Get code frequency (weekly additions/deletions).
+- `get_contributor_stats`: Get contributor statistics.
+- `get_emojis`: Get GitHub emoji URLs and codes.
+- `get_feeds`: Get GitHub feeds available to the authenticated user.
+- `get_gitignore_template`: Get a specific .gitignore template.
+- `get_license`: Get a specific open source license template.
+- `get_meta`: Get GitHub API meta info (IP ranges, SSH keys, etc.).
+- `get_octocat`: Get a random Zen saying or Octocat ASCII art.
+- `get_participation_stats`: Get participation stats for a repository.
+- `get_punch_card`: Get the punch card for a repository.
+- `get_rate_limit_details`: Get detailed rate limit status.
+- `get_root`: Get GitHub API root endpoint info.
+- `get_weekly_commit_activity`: Get weekly commit activity for a repository.
+- `get_zen`: Get a random Zen of GitHub design philosophy.
+- `list_codes_of_conduct`: List all codes of conduct.
+- `list_gitignore_templates`: List all .gitignore templates.
+- `list_licenses`: List all available open source license templates.
+- `list_stargazers`: List users who have starred a repository.
+- `list_tools`: List all available tools in the GitHub Issues Manager with descriptions.
+- `list_watchers`: List users watching a repository.
+- `rate_limit`: Check GitHub API rate limit status.
+- `render_markdown`: Render GitHub Flavored Markdown text to HTML.
+- `repo_traffic`: Get repository traffic data (clones and views).
+
+---
+
 ## License
 
 MIT License — see `LICENSE` for details.
