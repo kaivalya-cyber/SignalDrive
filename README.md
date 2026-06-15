@@ -719,6 +719,15 @@ issues-manager "Show me open issues in this repo"
 - `get_org_custom_role`: Get a single custom repository role from an organization.
 - `update_org_custom_role`: Update a custom repository role in an organization.
 
+#### Organization Security Managers
+- `add_org_security_manager`: Add a team as a security manager for an organization.
+- `remove_org_security_manager`: Remove a team as a security manager from an organization.
+
+#### Organization Interaction Limits
+- `get_org_interaction_limits`: Get interaction limits for an organization.
+- `remove_org_interaction_limits`: Remove interaction limits for an organization.
+- `set_org_interaction_limits`: Set interaction limits for an organization.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

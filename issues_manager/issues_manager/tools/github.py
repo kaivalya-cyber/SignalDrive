@@ -12109,6 +12109,96 @@ def get_org_custom_role(org: str, role_id: str) -> str:
 
 
 @tool(
+    name="add_org_security_manager",
+    description="Add a team as a security manager for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+    },
+    required=["org", "team_slug"],
+)
+def add_org_security_manager(org: str, team_slug: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/security-managers/teams/{team_slug}",
+            "--method", "PUT", "--silent", timeout=15)
+        return f"Team '{team_slug}' added as security manager in {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_org_security_manager",
+    description="Remove a team as a security manager from an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+    },
+    required=["org", "team_slug"],
+)
+def remove_org_security_manager(org: str, team_slug: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/security-managers/teams/{team_slug}",
+            "--method", "DELETE", "--silent", timeout=15)
+        return f"Team '{team_slug}' removed as security manager from {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_org_interaction_limits",
+    description="Get interaction limits for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def get_org_interaction_limits(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/interaction-limits")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_org_interaction_limits",
+    description="Set interaction limits for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "limit": {"type": "string", "description": "Limit type: existing_users, contributors_only, collaborators_only"},
+        "expiry": {"type": "string", "description": "Expiry: one_day, three_days, one_week, one_month, six_months"},
+    },
+    required=["org", "limit"],
+)
+def set_org_interaction_limits(org: str, limit: str, expiry: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"limit": limit}
+        if expiry:
+            payload["expiry"] = expiry
+        return _gh("api", f"orgs/{org}/interaction-limits", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_org_interaction_limits",
+    description="Remove interaction limits for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def remove_org_interaction_limits(org: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/interaction-limits", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Interaction limits removed for {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
