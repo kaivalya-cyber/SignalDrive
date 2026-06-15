@@ -12648,6 +12648,97 @@ def list_codespace_secrets(repo: str) -> str:
 
 
 @tool(
+    name="merge_branch",
+    description="Merge a branch into the default branch via the API.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "head": {"type": "string", "description": "Head branch to merge from"},
+        "base": {"type": "string", "description": "Base branch to merge into (default: repo default)"},
+        "commit_message": {"type": "string", "description": "Commit message (optional)"},
+    },
+    required=["repo", "head"],
+)
+def merge_branch(repo: str, head: str, base: str = "", commit_message: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"head": head}
+        if base:
+            payload["base"] = base
+        if commit_message:
+            payload["commit_message"] = commit_message
+        return _gh("api", f"repos/{repo}/merges", "--method", "POST",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="sync_fork",
+    description="Sync a fork branch with the upstream repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "branch": {"type": "string", "description": "Branch to sync (default: default branch)"},
+    },
+    required=["repo"],
+)
+def sync_fork(repo: str, branch: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if branch:
+            payload["branch"] = branch
+        return _gh("api", f"repos/{repo}/merge-upstream", "--method", "POST",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_commit_activity",
+    description="Get the last year of commit activity data for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_commit_activity(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/stats/commit_activity")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_code_frequency_stats",
+    description="Get the code frequency (weekly additions/deletions) for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_code_frequency_stats(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/stats/code_frequency")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_participation_stats",
+    description="Get the weekly commit count by owner and by contributors for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_participation_stats(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/stats/participation")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={

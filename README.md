@@ -761,6 +761,13 @@ issues-manager "Show me open issues in this repo"
 - `list_codespace_secrets`: List codespace secrets for a repository.
 - `set_codespace_repo_secret`: Create or update a codespace secret for a repository.
 
+#### Advanced Branch Operations
+- `get_repo_code_frequency_stats`: Get the code frequency (weekly additions/deletions) for a repository.
+- `get_repo_commit_activity`: Get the last year of commit activity data for a repository.
+- `get_repo_participation_stats`: Get the weekly commit count by owner and by contributors for a repository.
+- `merge_branch`: Merge a branch into the default branch via the API.
+- `sync_fork`: Sync a fork branch with the upstream repository.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.
