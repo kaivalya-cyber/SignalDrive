@@ -11898,6 +11898,125 @@ def set_repo_custom_properties(repo: str, properties: str) -> str:
 
 
 @tool(
+    name="get_org_custom_properties",
+    description="Get all custom property definitions for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def get_org_custom_properties(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/properties/schema")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_org_custom_property",
+    description="Create a new custom property definition in an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "property_name": {"type": "string", "description": "Property name"},
+        "value_type": {"type": "string", "description": "Value type: string, single_select, multi_select, true_false, date"},
+        "description": {"type": "string", "description": "Property description"},
+        "allowed_values": {"type": "string", "description": "Comma-separated allowed values (for select types)"},
+        "default_value": {"type": "string", "description": "Default value"},
+        "required": {"type": "string", "description": "true/false: whether this property is required"},
+    },
+    required=["org", "property_name", "value_type"],
+)
+def create_org_custom_property(org: str, property_name: str, value_type: str,
+                                description: str = "", allowed_values: str = "",
+                                default_value: str = "", required: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"property_name": property_name, "value_type": value_type}
+        if description:
+            payload["description"] = description
+        if allowed_values:
+            payload["allowed_values"] = [v.strip() for v in allowed_values.split(",") if v.strip()]
+        if default_value:
+            payload["default_value"] = default_value
+        if required:
+            payload["required"] = required.lower() == "true"
+        return _gh("api", f"orgs/{org}/properties/schema", "--method", "POST",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_org_custom_property",
+    description="Update an existing custom property definition in an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "property_name": {"type": "string", "description": "Property name"},
+        "value_type": {"type": "string", "description": "Value type"},
+        "description": {"type": "string", "description": "Property description"},
+        "allowed_values": {"type": "string", "description": "Comma-separated allowed values"},
+        "default_value": {"type": "string", "description": "Default value"},
+        "required": {"type": "string", "description": "true/false"},
+    },
+    required=["org", "property_name"],
+)
+def update_org_custom_property(org: str, property_name: str, value_type: str = "",
+                                description: str = "", allowed_values: str = "",
+                                default_value: str = "", required: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"property_name": property_name}
+        if value_type:
+            payload["value_type"] = value_type
+        if description:
+            payload["description"] = description
+        if allowed_values:
+            payload["allowed_values"] = [v.strip() for v in allowed_values.split(",") if v.strip()]
+        if default_value:
+            payload["default_value"] = default_value
+        if required:
+            payload["required"] = required.lower() == "true"
+        return _gh("api", f"orgs/{org}/properties/schema", "--method", "PATCH",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_org_custom_property",
+    description="Remove a custom property definition from an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "property_name": {"type": "string", "description": "Property name"},
+    },
+    required=["org", "property_name"],
+)
+def remove_org_custom_property(org: str, property_name: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/properties/schema/{property_name}",
+            "--method", "DELETE", "--silent", timeout=15)
+        return f"Custom property '{property_name}' removed from {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="org_custom_property_values",
+    description="Get custom property values for all repos in an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "limit": {"type": "string", "description": "Max repos (default: 30)"},
+    },
+    required=["org"],
+)
+def org_custom_property_values(org: str, limit: str = "30") -> str:
+    try:
+        return _gh("api", f"orgs/{org}/properties/values?per_page={limit}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={

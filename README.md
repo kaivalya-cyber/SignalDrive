@@ -706,6 +706,13 @@ issues-manager "Show me open issues in this repo"
 - `get_enterprise_audit_log`: Get the audit log for an enterprise.
 - `get_enterprise_consumed_licenses`: Get consumed licenses for an enterprise.
 
+#### Organization Custom Properties
+- `create_org_custom_property`: Create a new custom property definition in an organization.
+- `get_org_custom_properties`: Get all custom property definitions for an organization.
+- `org_custom_property_values`: Get custom property values for all repos in an organization.
+- `remove_org_custom_property`: Remove a custom property definition from an organization.
+- `update_org_custom_property`: Update an existing custom property definition in an organization.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.
