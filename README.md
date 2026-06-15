@@ -786,6 +786,13 @@ issues-manager "Show me open issues in this repo"
 - `create_repo_readme`: Create or update README.md in a repository.
 - `get_issue_template`: Get the content of a specific issue template file.
 
+#### Team & Permission Management
+- `add_team_to_repo`: Add a team to a repository with a specific permission level.
+- `check_team_permission`: Check if a team has a specific permission level on a repository.
+- `get_repo_team_permission`: Get the permission level for a team on a repository.
+- `get_repo_teams`: List teams with access to a repository.
+- `remove_team_from_repo`: Remove a team from a repository.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

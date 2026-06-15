@@ -12989,6 +12989,98 @@ def create_repo_readme(repo: str, content: str, message: str, branch: str = "") 
 
 
 @tool(
+    name="get_repo_teams",
+    description="List teams with access to a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_teams(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/teams")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="add_team_to_repo",
+    description="Add a team to a repository with a specific permission level.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+        "permission": {"type": "string", "description": "Permission: pull, push, admin, maintain, triage"},
+    },
+    required=["repo", "team_slug"],
+)
+def add_team_to_repo(repo: str, team_slug: str, permission: str = "push") -> str:
+    try:
+        import json as j
+        payload = {"permission": permission}
+        return _gh("api", f"repos/{repo}/teams/{team_slug}", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="remove_team_from_repo",
+    description="Remove a team from a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+    },
+    required=["repo", "team_slug"],
+)
+def remove_team_from_repo(repo: str, team_slug: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/teams/{team_slug}", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Team '{team_slug}' removed from {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_team_permission",
+    description="Get the permission level for a team on a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+    },
+    required=["repo", "team_slug"],
+)
+def get_repo_team_permission(repo: str, team_slug: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/teams/{team_slug}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="check_team_permission",
+    description="Check if a team has a specific permission level on a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "team_slug": {"type": "string", "description": "Team slug"},
+        "permission": {"type": "string", "description": "Permission to check: pull, push, admin, maintain, triage"},
+    },
+    required=["repo", "team_slug", "permission"],
+)
+def check_team_permission(repo: str, team_slug: str, permission: str) -> str:
+    try:
+        result = _gh("api", f"repos/{repo}/teams/{team_slug}")
+        data = json.loads(result)
+        perms = data.get("permissions", {})
+        if perms.get(permission):
+            return f"Yes, team '{team_slug}' has '{permission}' permission on {repo}."
+        else:
+            return f"No, team '{team_slug}' does not have '{permission}' permission on {repo}. Has: {', '.join(p for p, v in perms.items() if v)}"
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
