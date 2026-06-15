@@ -728,6 +728,13 @@ issues-manager "Show me open issues in this repo"
 - `remove_org_interaction_limits`: Remove interaction limits for an organization.
 - `set_org_interaction_limits`: Set interaction limits for an organization.
 
+#### Organization Secrets & Variables
+- `delete_org_secret`: Delete an organization-level secret.
+- `delete_org_variable`: Delete an organization-level variable.
+- `list_org_variables`: List organization-level variables.
+- `set_org_secret`: Create or update an organization-level secret.
+- `set_org_variable`: Create or update an organization-level variable.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

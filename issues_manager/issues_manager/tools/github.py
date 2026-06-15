@@ -12199,6 +12199,96 @@ def remove_org_interaction_limits(org: str) -> str:
 
 
 @tool(
+    name="set_org_secret",
+    description="Create or update an organization-level secret.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "name": {"type": "string", "description": "Secret name"},
+        "value": {"type": "string", "description": "Secret value"},
+        "visibility": {"type": "string", "description": "Visibility: all, private, selected"},
+        "selected_repos": {"type": "string", "description": "Comma-separated repo names (for selected visibility)"},
+    },
+    required=["org", "name", "value", "visibility"],
+)
+def set_org_secret(org: str, name: str, value: str, visibility: str = "all", selected_repos: str = "") -> str:
+    try:
+        _gh("secret", "set", name, "--org", org, "--body", value,
+            "--visibility", visibility, timeout=15)
+        return f"Org secret '{name}' set in {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_org_secret",
+    description="Delete an organization-level secret.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "name": {"type": "string", "description": "Secret name"},
+    },
+    required=["org", "name"],
+)
+def delete_org_secret(org: str, name: str) -> str:
+    try:
+        _gh("secret", "delete", name, "--org", org, timeout=15)
+        return f"Org secret '{name}' deleted from {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_org_variable",
+    description="Create or update an organization-level variable.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "name": {"type": "string", "description": "Variable name"},
+        "value": {"type": "string", "description": "Variable value"},
+        "visibility": {"type": "string", "description": "Visibility: all, private, selected"},
+    },
+    required=["org", "name", "value", "visibility"],
+)
+def set_org_variable(org: str, name: str, value: str, visibility: str = "all") -> str:
+    try:
+        _gh("variable", "set", name, "--org", org, "--body", value,
+            "--visibility", visibility, timeout=15)
+        return f"Org variable '{name}' set in {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_org_variable",
+    description="Delete an organization-level variable.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "name": {"type": "string", "description": "Variable name"},
+    },
+    required=["org", "name"],
+)
+def delete_org_variable(org: str, name: str) -> str:
+    try:
+        _gh("variable", "delete", name, "--org", org, timeout=15)
+        return f"Org variable '{name}' deleted from {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_org_variables",
+    description="List organization-level variables.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def list_org_variables(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/actions/variables")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
