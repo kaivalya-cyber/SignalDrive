@@ -713,6 +713,12 @@ issues-manager "Show me open issues in this repo"
 - `remove_org_custom_property`: Remove a custom property definition from an organization.
 - `update_org_custom_property`: Update an existing custom property definition in an organization.
 
+#### Organization Custom Roles
+- `create_org_custom_role`: Create a custom repository role in an organization.
+- `delete_org_custom_role`: Delete a custom repository role from an organization.
+- `get_org_custom_role`: Get a single custom repository role from an organization.
+- `update_org_custom_role`: Update a custom repository role in an organization.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

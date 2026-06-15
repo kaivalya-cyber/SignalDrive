@@ -12017,6 +12017,98 @@ def org_custom_property_values(org: str, limit: str = "30") -> str:
 
 
 @tool(
+    name="create_org_custom_role",
+    description="Create a custom repository role in an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "name": {"type": "string", "description": "Role name"},
+        "description": {"type": "string", "description": "Role description"},
+        "base_role": {"type": "string", "description": "Base role: read, triage, write, maintain"},
+        "permissions": {"type": "string", "description": "JSON array of permission strings (e.g., [\"pull_requests:write\"])"},
+    },
+    required=["org", "name", "base_role"],
+)
+def create_org_custom_role(org: str, name: str, base_role: str, description: str = "", permissions: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"name": name, "base_role": base_role}
+        if description:
+            payload["description"] = description
+        if permissions:
+            payload["permissions"] = j.loads(permissions)
+        return _gh("api", f"orgs/{org}/custom-repository-roles", "--method", "POST",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_org_custom_role",
+    description="Update a custom repository role in an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "role_id": {"type": "string", "description": "Role ID"},
+        "name": {"type": "string", "description": "New role name"},
+        "description": {"type": "string", "description": "New role description"},
+        "base_role": {"type": "string", "description": "Base role"},
+        "permissions": {"type": "string", "description": "JSON array of permission strings"},
+    },
+    required=["org", "role_id"],
+)
+def update_org_custom_role(org: str, role_id: str, name: str = "", description: str = "",
+                            base_role: str = "", permissions: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if name:
+            payload["name"] = name
+        if description:
+            payload["description"] = description
+        if base_role:
+            payload["base_role"] = base_role
+        if permissions:
+            payload["permissions"] = j.loads(permissions)
+        return _gh("api", f"orgs/{org}/custom-repository-roles/{role_id}", "--method", "PATCH",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_org_custom_role",
+    description="Delete a custom repository role from an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "role_id": {"type": "string", "description": "Role ID"},
+    },
+    required=["org", "role_id"],
+)
+def delete_org_custom_role(org: str, role_id: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/custom-repository-roles/{role_id}",
+            "--method", "DELETE", "--silent", timeout=15)
+        return f"Custom role {role_id} deleted from {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_org_custom_role",
+    description="Get a single custom repository role from an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "role_id": {"type": "string", "description": "Role ID"},
+    },
+    required=["org", "role_id"],
+)
+def get_org_custom_role(org: str, role_id: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/custom-repository-roles/{role_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
