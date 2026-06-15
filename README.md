@@ -809,6 +809,18 @@ issues-manager "Show me open issues in this repo"
 - `list_deployment_branch_policies`: List deployment branch policies for an environment.
 - `list_repo_environments`: List environments for a repository.
 
+#### Repository Content & Customization
+- `get_repo_all_topics`: Get all topics for a repository.
+- `get_repo_gitignore`: Get the gitignore template for a repository.
+- `get_repo_license_content`: Get the license contents for a repository.
+- `replace_repo_topics`: Replace all topics for a repository.
+- `set_repo_gitignore`: Set the gitignore template for a repository.
+
+#### Deployments
+- `create_deployment_status`: Create a status for a deployment.
+- `list_deployment_statuses`: List statuses for a deployment.
+- `trigger_deployment`: Trigger a new deployment for a repository.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

@@ -11517,14 +11517,114 @@ def create_or_update_repo_environment(repo: str, env: str, wait_timer: str = "",
 )
 def get_repo_license_content(repo: str) -> str:
     try:
-        result = _gh("api", f"repos/{repo}/license")
-        data = json.loads(result)
-        return f"License: {data.get('license', {}).get('name', 'Unknown')}\nKey: {data.get('license', {}).get('key', 'Unknown')}\nPath: {data.get('path', 'N/A')}\nContent:\n{data.get('content', 'N/A')}"
+        return _gh("api", f"repos/{repo}/license")
     except RuntimeError as e:
         return f"Error: {e}"
 
 
 @tool(
+    name="get_repo_all_topics",
+    description="Get all topics for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_all_topics(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/topics")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="replace_repo_topics",
+    description="Replace all topics for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "topics": {"type": "string", "description": "Comma-separated list of topics"},
+    },
+    required=["repo", "topics"],
+)
+def replace_repo_topics(repo: str, topics: str) -> str:
+    try:
+        topic_list = [t.strip() for t in topics.split(",") if t.strip()]
+        return _gh("api", f"repos/{repo}/topics", "--method", "PUT",
+                    "--raw-field", json.dumps({"names": topic_list}))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_gitignore",
+    description="Get the gitignore template for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_gitignore(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/gitignore")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_repo_gitignore",
+    description="Set the gitignore template for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "gitignore_template": {"type": "string", "description": "Gitignore template name (e.g., Python)"},
+        "message": {"type": "string", "description": "Commit message"},
+        "branch": {"type": "string", "description": "Branch (default: default branch)"},
+    },
+    required=["repo", "gitignore_template", "message"],
+)
+def set_repo_gitignore(repo: str, gitignore_template: str, message: str, branch: str = "") -> str:
+    try:
+        import base64
+        content = _gh("api", f"gitignore/templates/{gitignore_template}")
+        data = json.loads(content)
+        source = data.get("source", "")
+        b64 = base64.b64encode(source.encode()).decode()
+        payload = {"message": message, "content": b64}
+        if branch:
+            payload["branch"] = branch
+        return _gh("api", f"repos/{repo}/contents/.gitignore", "--method", "PUT",
+                    "--raw-field", json.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="trigger_deployment",
+    description="Trigger a new deployment for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "ref": {"type": "string", "description": "Ref (branch, tag, or SHA) to deploy"},
+        "environment": {"type": "string", "description": "Environment name"},
+        "task": {"type": "string", "description": "Task to run (default: deploy)"},
+        "payload": {"type": "string", "description": "Optional JSON payload"},
+        "auto_merge": {"type": "boolean", "description": "Auto-merge the ref if needed"},
+    },
+    required=["repo", "ref", "environment"],
+)
+def trigger_deployment(repo: str, ref: str, environment: str, task: str = "deploy",
+                        payload: str = "", auto_merge: bool = True) -> str:
+    try:
+        body: dict = {"ref": ref, "environment": environment, "task": task, "auto_merge": auto_merge}
+        if payload:
+            body["payload"] = json.loads(payload)
+        return _gh("api", f"repos/{repo}/deployments", "--method", "POST",
+                    "--raw-field", json.dumps(body))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_tools",
+    description="List all available tools in the GitHub Issues Manager with descriptions.",
     name="get_all_repo_topics",
     description="Get all topics for a repository.",
     parameters={
