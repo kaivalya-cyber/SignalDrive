@@ -821,6 +821,35 @@ issues-manager "Show me open issues in this repo"
 - `list_deployment_statuses`: List statuses for a deployment.
 - `trigger_deployment`: Trigger a new deployment for a repository.
 
+#### Pages, Events & Rate Limiting
+- `get_pages`: Get information about a GitHub Pages site for a repository.
+- `get_pages_build`: Get the latest Pages build for a repository.
+- `get_rate_limit`: Get the current rate limit status for the authenticated user.
+- `list_org_events`: List public events for an organization.
+- `list_repo_events`: List events for a repository.
+- `update_pages`: Update information about a GitHub Pages site for a repository.
+
+#### Security Advisories & Automated Fixes
+- `disable_automated_security_fixes`: Disable automated security fixes for a repository.
+- `enable_automated_security_fixes`: Enable automated security fixes for a repository.
+- `export_sbom`: Export the SBOM for a repository in SPDX format.
+- `get_repo_security_advisory`: Get a specific repository security advisory.
+- `list_repo_security_advisories`: List security advisories for a repository.
+
+#### Code Owners & Collaborator Permissions
+- `get_codeowners_errors`: Get CODEOWNERS file errors for a repository.
+- `get_collaborator_permission_level`: Get the permission level for a collaborator on a repository.
+- `get_issue_event`: Get a specific issue event by ID.
+- `get_merge_queue_entry`: Get a specific merge queue entry for a repository.
+
+#### Pull Request Reviews & Invitations
+- `accept_repo_invitation`: Accept a repository invitation.
+- `create_pull_request_review`: Create a review on a pull request.
+- `create_pull_request_review_comment`: Create a review comment on a pull request diff.
+- `decline_repo_invitation`: Decline a repository invitation.
+- `delete_pull_request_review`: Delete a pull request review.
+- `submit_pull_request_review`: Submit a pending review on a pull request.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

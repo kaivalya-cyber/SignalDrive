@@ -11623,23 +11623,6 @@ def trigger_deployment(repo: str, ref: str, environment: str, task: str = "deplo
 
 
 @tool(
-    name="list_tools",
-    description="List all available tools in the GitHub Issues Manager with descriptions.",
-    name="get_all_repo_topics",
-    description="Get all topics for a repository.",
-    parameters={
-        "repo": {"type": "string", "description": "Owner/repo"},
-    },
-    required=["repo"],
-)
-def get_all_repo_topics(repo: str) -> str:
-    try:
-        return _gh("api", f"repos/{repo}/topics")
-    except RuntimeError as e:
-        return f"Error: {e}"
-
-
-@tool(
     name="get_dependabot_alert",
     description="Get a single Dependabot alert by number.",
     parameters={
@@ -13373,6 +13356,358 @@ def delete_deployment_branch_policy(repo: str, environment_name: str, policy_id:
 def get_environment_secrets(repo: str, environment_name: str) -> str:
     try:
         return _gh("api", f"repos/{repo}/environments/{environment_name}/secrets")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_rate_limit",
+    description="Get the current rate limit status for the authenticated user.",
+)
+def get_rate_limit() -> str:
+    try:
+        return _gh("api", "rate_limit")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_pages",
+    description="Get information about a GitHub Pages site for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_pages(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/pages")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_pages",
+    description="Update information about a GitHub Pages site for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "source_branch": {"type": "string", "description": "Source branch for Pages (e.g., main)"},
+        "source_path": {"type": "string", "description": "Source path: / or /docs"},
+        "build_type": {"type": "string", "description": "Build type: legacy or workflow"},
+    },
+    required=["repo"],
+)
+def update_pages(repo: str, source_branch: str = "main", source_path: str = "/",
+                  build_type: str = "legacy") -> str:
+    try:
+        body = {"source": {"branch": source_branch, "path": source_path},
+                "build_type": build_type}
+        return _gh("api", f"repos/{repo}/pages", "--method", "PUT",
+                    "--raw-field", json.dumps(body))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_pages_build",
+    description="Get the latest Pages build for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_pages_build(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/pages/builds/latest")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_repo_events",
+    description="List events for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def list_repo_events(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/events")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_org_events",
+    description="List public events for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def list_org_events(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/events")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_codeowners_errors",
+    description="Get CODEOWNERS file errors for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "ref": {"type": "string", "description": "Branch (default: default branch)"},
+    },
+    required=["repo"],
+)
+def get_codeowners_errors(repo: str, ref: str = "") -> str:
+    try:
+        path = f"repos/{repo}/codeowners/errors"
+        if ref:
+            path += f"?ref={ref}"
+        return _gh("api", path)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_collaborator_permission_level",
+    description="Get the permission level for a collaborator on a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "username": {"type": "string", "description": "Username"},
+    },
+    required=["repo", "username"],
+)
+def get_collaborator_permission_level(repo: str, username: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/collaborators/{username}/permission")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_merge_queue_entry",
+    description="Get a specific merge queue entry for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "entry_id": {"type": "number", "description": "Merge queue entry ID"},
+    },
+    required=["repo", "entry_id"],
+)
+def get_merge_queue_entry(repo: str, entry_id: int) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/merge-queue/entries/{entry_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_security_advisory",
+    description="Get a specific repository security advisory.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "ghsa_id": {"type": "string", "description": "GHSA ID of the advisory"},
+    },
+    required=["repo", "ghsa_id"],
+)
+def get_repo_security_advisory(repo: str, ghsa_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/security-advisories/{ghsa_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="export_sbom",
+    description="Export the SBOM for a repository in SPDX format.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def export_sbom(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/dependency-graph/sbom")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="enable_automated_security_fixes",
+    description="Enable automated security fixes for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def enable_automated_security_fixes(repo: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/automated-security-fixes", "--method", "PUT",
+            "--silent", timeout=15)
+        return f"Automated security fixes enabled for {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="disable_automated_security_fixes",
+    description="Disable automated security fixes for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def disable_automated_security_fixes(repo: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/automated-security-fixes", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Automated security fixes disabled for {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="accept_repo_invitation",
+    description="Accept a repository invitation.",
+    parameters={
+        "invitation_id": {"type": "number", "description": "Invitation ID"},
+    },
+    required=["invitation_id"],
+)
+def accept_repo_invitation(invitation_id: int) -> str:
+    try:
+        _gh("api", f"user/repository_invitations/{invitation_id}", "--method", "PATCH",
+            "--silent", timeout=15)
+        return f"Invitation {invitation_id} accepted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="decline_repo_invitation",
+    description="Decline a repository invitation.",
+    parameters={
+        "invitation_id": {"type": "number", "description": "Invitation ID"},
+    },
+    required=["invitation_id"],
+)
+def decline_repo_invitation(invitation_id: int) -> str:
+    try:
+        _gh("api", f"user/repository_invitations/{invitation_id}", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Invitation {invitation_id} declined."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_issue_event",
+    description="Get a specific issue event by ID.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "event_id": {"type": "number", "description": "Event ID"},
+    },
+    required=["repo", "event_id"],
+)
+def get_issue_event(repo: str, event_id: int) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/issues/events/{event_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_pull_request_review",
+    description="Create a review on a pull request.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "pr_number": {"type": "number", "description": "Pull request number"},
+        "body": {"type": "string", "description": "Review body text"},
+        "event": {"type": "string", "description": "Review action: APPROVE, REQUEST_CHANGES, COMMENT"},
+        "commit_id": {"type": "string", "description": "SHA of commit to review (optional)"},
+    },
+    required=["repo", "pr_number", "body", "event"],
+)
+def create_pull_request_review(repo: str, pr_number: int, body: str, event: str,
+                                commit_id: str = "") -> str:
+    try:
+        payload: dict = {"body": body, "event": event}
+        if commit_id:
+            payload["commit_id"] = commit_id
+        return _gh("api", f"repos/{repo}/pulls/{pr_number}/reviews", "--method", "POST",
+                    "--raw-field", json.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="submit_pull_request_review",
+    description="Submit a pending review on a pull request.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "pr_number": {"type": "number", "description": "Pull request number"},
+        "review_id": {"type": "number", "description": "Review ID"},
+        "body": {"type": "string", "description": "Review body text (optional)"},
+        "event": {"type": "string", "description": "Review action: APPROVE, REQUEST_CHANGES, COMMENT"},
+    },
+    required=["repo", "pr_number", "review_id", "event"],
+)
+def submit_pull_request_review(repo: str, pr_number: int, review_id: int, event: str,
+                                body: str = "") -> str:
+    try:
+        payload: dict = {"event": event}
+        if body:
+            payload["body"] = body
+        return _gh("api", f"repos/{repo}/pulls/{pr_number}/reviews/{review_id}/events",
+                    "--method", "POST", "--raw-field", json.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_pull_request_review",
+    description="Delete a pull request review.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "pr_number": {"type": "number", "description": "Pull request number"},
+        "review_id": {"type": "number", "description": "Review ID"},
+    },
+    required=["repo", "pr_number", "review_id"],
+)
+def delete_pull_request_review(repo: str, pr_number: int, review_id: int) -> str:
+    try:
+        _gh("api", f"repos/{repo}/pulls/{pr_number}/reviews/{review_id}", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Review {review_id} deleted from PR #{pr_number}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_pull_request_review_comment",
+    description="Create a review comment on a pull request diff.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "pr_number": {"type": "number", "description": "Pull request number"},
+        "body": {"type": "string", "description": "Comment text"},
+        "commit_id": {"type": "string", "description": "SHA of the commit to comment on"},
+        "path": {"type": "string", "description": "File path to comment on"},
+        "line": {"type": "number", "description": "Line number in the file"},
+        "side": {"type": "string", "description": "Side of the diff: LEFT or RIGHT"},
+    },
+    required=["repo", "pr_number", "body", "commit_id", "path", "line"],
+)
+def create_pull_request_review_comment(repo: str, pr_number: int, body: str,
+                                        commit_id: str, path: str, line: int,
+                                        side: str = "RIGHT") -> str:
+    try:
+        body_payload = {"body": body, "commit_id": commit_id, "path": path,
+                        "line": line, "side": side}
+        return _gh("api", f"repos/{repo}/pulls/{pr_number}/comments", "--method", "POST",
+                    "--raw-field", json.dumps(body_payload))
     except RuntimeError as e:
         return f"Error: {e}"
 
