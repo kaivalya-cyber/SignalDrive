@@ -768,6 +768,12 @@ issues-manager "Show me open issues in this repo"
 - `merge_branch`: Merge a branch into the default branch via the API.
 - `sync_fork`: Sync a fork branch with the upstream repository.
 
+#### Community & Guidelines
+- `create_repo_contributing_guidelines`: Create or update CONTRIBUTING.md in a repository.
+- `create_repo_support_guidelines`: Create or update SUPPORT.md in a repository.
+- `get_repo_community_profile`: Get the community profile for a repository.
+- `set_repo_code_of_conduct`: Set the code of conduct for a repository.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

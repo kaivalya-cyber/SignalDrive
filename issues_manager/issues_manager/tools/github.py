@@ -12739,6 +12739,89 @@ def get_repo_participation_stats(repo: str) -> str:
 
 
 @tool(
+    name="set_repo_code_of_conduct",
+    description="Set the code of conduct for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "code_of_conduct_key": {"type": "string", "description": "Key of the code of conduct (e.g., contributor_covenant)"},
+    },
+    required=["repo", "code_of_conduct_key"],
+)
+def set_repo_code_of_conduct(repo: str, code_of_conduct_key: str) -> str:
+    try:
+        import json as j
+        payload = {"code_of_conduct": {"key": code_of_conduct_key}}
+        _gh("api", f"repos/{repo}/community/code_of_conduct", "--method", "PUT",
+            "--raw-field", j.dumps(payload), "--silent", timeout=15)
+        return f"Code of conduct set to '{code_of_conduct_key}' for {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_community_profile",
+    description="Get the community profile for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_community_profile(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/community/profile")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_repo_contributing_guidelines",
+    description="Create or update CONTRIBUTING.md in a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "content": {"type": "string", "description": "Content of CONTRIBUTING.md"},
+        "message": {"type": "string", "description": "Commit message"},
+        "branch": {"type": "string", "description": "Branch (default: default branch)"},
+    },
+    required=["repo", "content", "message"],
+)
+def create_repo_contributing_guidelines(repo: str, content: str, message: str, branch: str = "") -> str:
+    try:
+        import json as j, base64
+        b64 = base64.b64encode(content.encode()).decode()
+        payload = {"message": message, "content": b64}
+        if branch:
+            payload["branch"] = branch
+        return _gh("api", f"repos/{repo}/contents/CONTRIBUTING.md", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_repo_support_guidelines",
+    description="Create or update SUPPORT.md in a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "content": {"type": "string", "description": "Content of SUPPORT.md"},
+        "message": {"type": "string", "description": "Commit message"},
+        "branch": {"type": "string", "description": "Branch (default: default branch)"},
+    },
+    required=["repo", "content", "message"],
+)
+def create_repo_support_guidelines(repo: str, content: str, message: str, branch: str = "") -> str:
+    try:
+        import json as j, base64
+        b64 = base64.b64encode(content.encode()).decode()
+        payload = {"message": message, "content": b64}
+        if branch:
+            payload["branch"] = branch
+        return _gh("api", f"repos/{repo}/contents/SUPPORT.md", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
