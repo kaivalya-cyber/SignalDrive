@@ -12473,6 +12473,90 @@ def get_cache_usage(repo: str) -> str:
 
 
 @tool(
+    name="create_repo_security_advisory",
+    description="Create a repository security advisory.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "summary": {"type": "string", "description": "Advisory summary"},
+        "description": {"type": "string", "description": "Advisory description"},
+        "severity": {"type": "string", "description": "Severity: critical, high, medium, low"},
+        "cve_id": {"type": "string", "description": "CVE ID (optional)"},
+        "vulnerabilities": {"type": "string", "description": "JSON array of vulnerability objects (optional)"},
+        "credits": {"type": "string", "description": "Comma-separated usernames to credit (optional)"},
+    },
+    required=["repo", "summary", "description", "severity"],
+)
+def create_repo_security_advisory(repo: str, summary: str, description: str, severity: str,
+                                   cve_id: str = "", vulnerabilities: str = "", credits: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {
+            "summary": summary,
+            "description": description,
+            "severity": severity,
+        }
+        if cve_id:
+            payload["cve_id"] = cve_id
+        if vulnerabilities:
+            payload["vulnerabilities"] = j.loads(vulnerabilities)
+        if credits:
+            payload["credits"] = [{"login": u.strip()} for u in credits.split(",") if u.strip()]
+        return _gh("api", f"repos/{repo}/security-advisories", "--method", "POST",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_repo_security_advisory",
+    description="Update a repository security advisory.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "ghsa_id": {"type": "string", "description": "GHSA ID of the advisory"},
+        "summary": {"type": "string", "description": "New summary"},
+        "description": {"type": "string", "description": "New description"},
+        "severity": {"type": "string", "description": "New severity"},
+    },
+    required=["repo", "ghsa_id"],
+)
+def update_repo_security_advisory(repo: str, ghsa_id: str, summary: str = "",
+                                    description: str = "", severity: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if summary:
+            payload["summary"] = summary
+        if description:
+            payload["description"] = description
+        if severity:
+            payload["severity"] = severity
+        return _gh("api", f"repos/{repo}/security-advisories/{ghsa_id}", "--method", "PATCH",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_repo_security_advisories",
+    description="List all security advisories in a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "state": {"type": "string", "description": "Filter by state: published, closed, draft"},
+        "limit": {"type": "string", "description": "Max results (default: 10)"},
+    },
+    required=["repo"],
+)
+def list_repo_security_advisories(repo: str, state: str = "", limit: str = "10") -> str:
+    try:
+        args = f"repos/{repo}/security-advisories?per_page={limit}"
+        if state:
+            args += f"&state={state}"
+        return _gh("api", args)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={

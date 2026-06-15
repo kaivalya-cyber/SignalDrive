@@ -749,6 +749,11 @@ issues-manager "Show me open issues in this repo"
 - `set_artifact_retention`: Set the artifact and log retention period for a repository.
 - `set_org_artifact_retention`: Set the artifact and log retention period for an organization.
 
+#### Security Advisories
+- `create_repo_security_advisory`: Create a repository security advisory.
+- `list_repo_security_advisories`: List all security advisories in a repository.
+- `update_repo_security_advisory`: Update a repository security advisory.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.
