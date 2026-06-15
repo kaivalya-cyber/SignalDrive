@@ -774,6 +774,12 @@ issues-manager "Show me open issues in this repo"
 - `get_repo_community_profile`: Get the community profile for a repository.
 - `set_repo_code_of_conduct`: Set the code of conduct for a repository.
 
+#### Security & Analysis Settings
+- `disable_secret_push_protection`: Disable push protection for secret scanning at the organization level.
+- `enable_secret_push_protection`: Enable push protection for secret scanning at the organization level.
+- `get_org_push_protection`: Get push protection status for an organization.
+- `set_repo_security_and_analysis`: Set security and analysis settings for a repository.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

@@ -12822,6 +12822,84 @@ def create_repo_support_guidelines(repo: str, content: str, message: str, branch
 
 
 @tool(
+    name="get_org_push_protection",
+    description="Get push protection status for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def get_org_push_protection(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/org-secret-scanning/push-protection")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="enable_secret_push_protection",
+    description="Enable push protection for secret scanning at the organization level.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def enable_secret_push_protection(org: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/org-secret-scanning/push-protection", "--method", "POST",
+            "--silent", timeout=15)
+        return f"Push protection enabled for {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="disable_secret_push_protection",
+    description="Disable push protection for secret scanning at the organization level.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def disable_secret_push_protection(org: str) -> str:
+    try:
+        _gh("api", f"orgs/{org}/org-secret-scanning/push-protection", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Push protection disabled for {org}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_repo_security_and_analysis",
+    description="Set security and analysis settings for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "advanced_security": {"type": "string", "description": "true/false: enable GitHub Advanced Security"},
+        "secret_scanning": {"type": "string", "description": "true/false: enable secret scanning"},
+        "secret_scanning_push_protection": {"type": "string", "description": "true/false: enable push protection"},
+    },
+    required=["repo"],
+)
+def set_repo_security_and_analysis(repo: str, advanced_security: str = "",
+                                    secret_scanning: str = "",
+                                    secret_scanning_push_protection: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if advanced_security:
+            payload["advanced_security"] = {"status": "enabled" if advanced_security.lower() == "true" else "disabled"}
+        if secret_scanning:
+            payload["secret_scanning"] = {"status": "enabled" if secret_scanning.lower() == "true" else "disabled"}
+        if secret_scanning_push_protection:
+            payload["secret_scanning_push_protection"] = {"status": "enabled" if secret_scanning_push_protection.lower() == "true" else "disabled"}
+        return _gh("api", f"repos/{repo}/security-and-analysis", "--method", "PATCH",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
