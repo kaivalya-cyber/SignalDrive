@@ -735,6 +735,13 @@ issues-manager "Show me open issues in this repo"
 - `set_org_secret`: Create or update an organization-level secret.
 - `set_org_variable`: Create or update an organization-level variable.
 
+#### Actions / Permissions & Required Workflows
+- `get_allowed_actions`: Get the allowed actions for an organization or repository.
+- `get_org_actions_permissions`: Get the Actions permissions for an organization.
+- `list_org_required_workflows`: List all required workflows in an organization.
+- `set_allowed_actions`: Set the allowed actions for an organization or repository.
+- `set_org_actions_permissions`: Set the Actions permissions for an organization.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

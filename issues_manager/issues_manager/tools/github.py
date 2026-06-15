@@ -12289,6 +12289,109 @@ def list_org_variables(org: str) -> str:
 
 
 @tool(
+    name="get_allowed_actions",
+    description="Get the allowed actions for an organization or repository.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name (optional)"},
+        "repo": {"type": "string", "description": "Owner/repo (optional)"},
+    },
+    required=[],
+)
+def get_allowed_actions(org: str = "", repo: str = "") -> str:
+    try:
+        if org:
+            return _gh("api", f"orgs/{org}/actions/permissions/selected-actions")
+        elif repo:
+            return _gh("api", f"repos/{repo}/actions/permissions/selected-actions")
+        else:
+            return "Specify either org or repo."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_allowed_actions",
+    description="Set the allowed actions for an organization or repository.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "github_owned_allowed": {"type": "string", "description": "true/false: allow GitHub-owned actions"},
+        "verified_allowed": {"type": "string", "description": "true/false: allow verified creator actions"},
+        "patterns_allowed": {"type": "string", "description": "Comma-separated action patterns (e.g., actions/*)"},
+    },
+    required=["org"],
+)
+def set_allowed_actions(org: str, github_owned_allowed: str = "",
+                         verified_allowed: str = "", patterns_allowed: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if github_owned_allowed:
+            payload["github_owned_allowed"] = github_owned_allowed.lower() == "true"
+        if verified_allowed:
+            payload["verified_allowed"] = verified_allowed.lower() == "true"
+        if patterns_allowed:
+            payload["patterns_allowed"] = [p.strip() for p in patterns_allowed.split(",") if p.strip()]
+        return _gh("api", f"orgs/{org}/actions/permissions/selected-actions", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_org_actions_permissions",
+    description="Get the Actions permissions for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def get_org_actions_permissions(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/actions/permissions")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_org_actions_permissions",
+    description="Set the Actions permissions for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "enabled_repos": {"type": "string", "description": "true/false: enable Actions for all repos"},
+        "allowed_actions": {"type": "string", "description": "all, local_only, selected"},
+    },
+    required=["org"],
+)
+def set_org_actions_permissions(org: str, enabled_repos: str = "", allowed_actions: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {}
+        if enabled_repos:
+            payload["enabled_repositories"] = "all" if enabled_repos.lower() == "true" else "selected"
+        if allowed_actions:
+            payload["allowed_actions"] = allowed_actions
+        return _gh("api", f"orgs/{org}/actions/permissions", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_org_required_workflows",
+    description="List all required workflows in an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def list_org_required_workflows(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/actions/required_workflows")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
