@@ -12557,6 +12557,97 @@ def list_repo_security_advisories(repo: str, state: str = "", limit: str = "10")
 
 
 @tool(
+    name="list_codespace_machines",
+    description="List machine types available for a codespace.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "branch": {"type": "string", "description": "Branch (optional)"},
+        "location": {"type": "string", "description": "Location (optional)"},
+    },
+    required=["repo"],
+)
+def list_codespace_machines(repo: str, branch: str = "", location: str = "") -> str:
+    try:
+        args = f"repos/{repo}/codespaces/machines"
+        params = []
+        if branch:
+            params.append(f"ref={branch}")
+        if location:
+            params.append(f"location={location}")
+        if params:
+            args += "?" + "&".join(params)
+        return _gh("api", args)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_codespace_repo_secret",
+    description="Get a codespace secret for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "name": {"type": "string", "description": "Secret name"},
+    },
+    required=["repo", "name"],
+)
+def get_codespace_repo_secret(repo: str, name: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/codespaces/secrets/{name}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_codespace_repo_secret",
+    description="Create or update a codespace secret for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "name": {"type": "string", "description": "Secret name"},
+        "value": {"type": "string", "description": "Secret value"},
+    },
+    required=["repo", "name", "value"],
+)
+def set_codespace_repo_secret(repo: str, name: str, value: str) -> str:
+    try:
+        _gh("secret", "set", name, "--repo", repo, "--codespace", "--body", value, timeout=15)
+        return f"Codespace secret '{name}' set in {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_codespace_repo_secret",
+    description="Delete a codespace secret from a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "name": {"type": "string", "description": "Secret name"},
+    },
+    required=["repo", "name"],
+)
+def delete_codespace_repo_secret(repo: str, name: str) -> str:
+    try:
+        _gh("secret", "delete", name, "--repo", repo, "--codespace", timeout=15)
+        return f"Codespace secret '{name}' deleted from {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_codespace_secrets",
+    description="List codespace secrets for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def list_codespace_secrets(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/codespaces/secrets")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={

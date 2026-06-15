@@ -754,6 +754,13 @@ issues-manager "Show me open issues in this repo"
 - `list_repo_security_advisories`: List all security advisories in a repository.
 - `update_repo_security_advisory`: Update a repository security advisory.
 
+#### Codespaces / Machines & Secrets
+- `delete_codespace_repo_secret`: Delete a codespace secret from a repository.
+- `get_codespace_repo_secret`: Get a codespace secret for a repository.
+- `list_codespace_machines`: List machine types available for a codespace.
+- `list_codespace_secrets`: List codespace secrets for a repository.
+- `set_codespace_repo_secret`: Create or update a codespace secret for a repository.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.
