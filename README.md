@@ -793,6 +793,13 @@ issues-manager "Show me open issues in this repo"
 - `get_repo_teams`: List teams with access to a repository.
 - `remove_team_from_repo`: Remove a team from a repository.
 
+#### Traffic & Analytics
+- `get_repo_languages`: Get the language breakdown for a repository.
+- `get_top_popular_paths`: Get the top popular paths for a repository over the last 14 days.
+- `get_top_referrer_paths`: Get the top referrer sources for a repository over the last 14 days.
+- `get_traffic_clones`: Get the number of clones for a repository in the last 14 days.
+- `get_traffic_views`: Get the number of views for a repository in the last 14 days.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

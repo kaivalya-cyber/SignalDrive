@@ -13081,6 +13081,81 @@ def check_team_permission(repo: str, team_slug: str, permission: str) -> str:
 
 
 @tool(
+    name="get_traffic_clones",
+    description="Get the number of clones for a repository in the last 14 days.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_traffic_clones(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/traffic/clones")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_traffic_views",
+    description="Get the number of views for a repository in the last 14 days.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_traffic_views(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/traffic/views")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_repo_languages",
+    description="Get the language breakdown for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_repo_languages(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/languages")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_top_referrer_paths",
+    description="Get the top referrer sources for a repository over the last 14 days.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_top_referrer_paths(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/traffic/popular/referrers")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_top_popular_paths",
+    description="Get the top popular paths for a repository over the last 14 days.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_top_popular_paths(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/traffic/popular/paths")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
