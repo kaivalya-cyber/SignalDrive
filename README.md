@@ -850,6 +850,24 @@ issues-manager "Show me open issues in this repo"
 - `delete_pull_request_review`: Delete a pull request review.
 - `submit_pull_request_review`: Submit a pending review on a pull request.
 
+#### App Management & Tokens
+- `create_installation_access_token`: Create an access token for an app installation.
+- `get_app_installation`: Get an app installation by ID.
+- `get_app_slug`: Get the authenticated app using its slug.
+
+#### Code Scanning, LFS & Project Boards
+- `create_project_column`: Create a column in a project board.
+- `get_lfs_settings`: Get Git LFS settings for a repository.
+- `get_sarif`: Get a SARIF upload by its ID.
+- `list_project_cards`: List cards in a project column.
+- `update_lfs_settings`: Enable or disable Git LFS for a repository.
+
+#### GPG & SSH Key Management
+- `delete_gpg_key`: Delete a GPG key for the authenticated user.
+- `delete_ssh_key`: Delete an SSH key for the authenticated user.
+- `get_gpg_key`: Get a specific GPG key for the authenticated user.
+- `get_ssh_key`: Get a specific SSH key for the authenticated user.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

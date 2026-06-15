@@ -13713,6 +13713,210 @@ def create_pull_request_review_comment(repo: str, pr_number: int, body: str,
 
 
 @tool(
+    name="get_app_slug",
+    description="Get the authenticated app using its slug.",
+    parameters={
+        "app_slug": {"type": "string", "description": "App slug"},
+    },
+    required=["app_slug"],
+)
+def get_app_slug(app_slug: str) -> str:
+    try:
+        return _gh("api", f"apps/{app_slug}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_app_installation",
+    description="Get an app installation by ID.",
+    parameters={
+        "installation_id": {"type": "number", "description": "Installation ID"},
+    },
+    required=["installation_id"],
+)
+def get_app_installation(installation_id: int) -> str:
+    try:
+        return _gh("api", f"app/installations/{installation_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_installation_access_token",
+    description="Create an access token for an app installation.",
+    parameters={
+        "installation_id": {"type": "number", "description": "Installation ID"},
+        "repositories": {"type": "string", "description": "Comma-separated repo names (optional)"},
+        "permissions": {"type": "string", "description": "JSON object of permissions (optional)"},
+    },
+    required=["installation_id"],
+)
+def create_installation_access_token(installation_id: int, repositories: str = "", permissions: str = "") -> str:
+    try:
+        body: dict = {}
+        if repositories:
+            body["repositories"] = [r.strip() for r in repositories.split(",") if r.strip()]
+        if permissions:
+            body["permissions"] = json.loads(permissions)
+        return _gh("api", f"app/installations/{installation_id}/access_tokens", "--method", "POST",
+                    "--raw-field", json.dumps(body))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_sarif",
+    description="Get a SARIF upload by its ID.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "sarif_id": {"type": "string", "description": "SARIF ID"},
+    },
+    required=["repo", "sarif_id"],
+)
+def get_sarif(repo: str, sarif_id: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/code-scanning/sarifs/{sarif_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_lfs_settings",
+    description="Get Git LFS settings for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_lfs_settings(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/lfs")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="update_lfs_settings",
+    description="Enable or disable Git LFS for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "enabled": {"type": "boolean", "description": "Enable or disable LFS"},
+    },
+    required=["repo", "enabled"],
+)
+def update_lfs_settings(repo: str, enabled: bool) -> str:
+    try:
+        _gh("api", f"repos/{repo}/lfs", "--method", "PATCH",
+            "--raw-field", json.dumps({"enabled": enabled}),
+            "--silent", timeout=15)
+        status = "enabled" if enabled else "disabled"
+        return f"Git LFS {status} for {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_project_column",
+    description="Create a column in a project board.",
+    parameters={
+        "project_id": {"type": "number", "description": "Project ID"},
+        "name": {"type": "string", "description": "Column name"},
+    },
+    required=["project_id", "name"],
+)
+def create_project_column(project_id: int, name: str) -> str:
+    try:
+        return _gh("api", f"projects/{project_id}/columns", "--method", "POST",
+                    "--raw-field", json.dumps({"name": name}))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_project_cards",
+    description="List cards in a project column.",
+    parameters={
+        "column_id": {"type": "number", "description": "Column ID"},
+        "archived_state": {"type": "string", "description": "Filter by archived state: archived, not_archived, all"},
+    },
+    required=["column_id"],
+)
+def list_project_cards(column_id: int, archived_state: str = "") -> str:
+    try:
+        path = f"projects/columns/{column_id}/cards"
+        if archived_state:
+            path += f"?archived_state={archived_state}"
+        return _gh("api", path)
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_gpg_key",
+    description="Get a specific GPG key for the authenticated user.",
+    parameters={
+        "gpg_key_id": {"type": "number", "description": "GPG key ID"},
+    },
+    required=["gpg_key_id"],
+)
+def get_gpg_key(gpg_key_id: int) -> str:
+    try:
+        return _gh("api", f"user/gpg_keys/{gpg_key_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_gpg_key",
+    description="Delete a GPG key for the authenticated user.",
+    parameters={
+        "gpg_key_id": {"type": "number", "description": "GPG key ID"},
+    },
+    required=["gpg_key_id"],
+)
+def delete_gpg_key(gpg_key_id: int) -> str:
+    try:
+        _gh("api", f"user/gpg_keys/{gpg_key_id}", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"GPG key {gpg_key_id} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_ssh_key",
+    description="Get a specific SSH key for the authenticated user.",
+    parameters={
+        "ssh_key_id": {"type": "number", "description": "SSH key ID"},
+    },
+    required=["ssh_key_id"],
+)
+def get_ssh_key(ssh_key_id: int) -> str:
+    try:
+        return _gh("api", f"user/keys/{ssh_key_id}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_ssh_key",
+    description="Delete an SSH key for the authenticated user.",
+    parameters={
+        "ssh_key_id": {"type": "number", "description": "SSH key ID"},
+    },
+    required=["ssh_key_id"],
+)
+def delete_ssh_key(ssh_key_id: int) -> str:
+    try:
+        _gh("api", f"user/keys/{ssh_key_id}", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"SSH key {ssh_key_id} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
