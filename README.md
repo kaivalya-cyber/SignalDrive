@@ -800,6 +800,15 @@ issues-manager "Show me open issues in this repo"
 - `get_traffic_clones`: Get the number of clones for a repository in the last 14 days.
 - `get_traffic_views`: Get the number of views for a repository in the last 14 days.
 
+#### Environments & Deployment Branch Policies
+- `create_deployment_branch_policy`: Create a deployment branch policy for an environment.
+- `create_repo_environment`: Create or update an environment in a repository.
+- `delete_deployment_branch_policy`: Delete a deployment branch policy for an environment.
+- `delete_repo_environment`: Delete an environment from a repository.
+- `get_environment_secrets`: List environment secrets for an environment.
+- `list_deployment_branch_policies`: List deployment branch policies for an environment.
+- `list_repo_environments`: List environments for a repository.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

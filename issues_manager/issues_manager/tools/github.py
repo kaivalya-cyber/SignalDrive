@@ -11508,23 +11508,6 @@ def create_or_update_repo_environment(repo: str, env: str, wait_timer: str = "",
 
 
 @tool(
-    name="delete_repo_environment",
-    description="Delete a repository environment.",
-    parameters={
-        "repo": {"type": "string", "description": "Owner/repo"},
-        "env": {"type": "string", "description": "Environment name"},
-    },
-    required=["repo", "env"],
-)
-def delete_repo_environment(repo: str, env: str) -> str:
-    try:
-        _gh("api", f"repos/{repo}/environments/{env}", "--method", "DELETE", "--silent", timeout=15)
-        return f"Environment '{env}' deleted from {repo}."
-    except RuntimeError as e:
-        return f"Error: {e}"
-
-
-@tool(
     name="get_repo_license_content",
     description="Get the license contents for a repository (includes the full license text).",
     parameters={
@@ -13151,6 +13134,145 @@ def get_top_referrer_paths(repo: str) -> str:
 def get_top_popular_paths(repo: str) -> str:
     try:
         return _gh("api", f"repos/{repo}/traffic/popular/paths")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_repo_environments",
+    description="List environments for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def list_repo_environments(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/environments")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_repo_environment",
+    description="Create or update an environment in a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "environment_name": {"type": "string", "description": "Environment name"},
+        "wait_timer": {"type": "number", "description": "Wait timer in minutes (optional)"},
+        "reviewers": {"type": "string", "description": "Comma-separated list of reviewer teams (slugs) or users (optional)"},
+        "deployment_branch_policy": {"type": "string", "description": "Branch policy: all, selected, or empty for none"},
+    },
+    required=["repo", "environment_name"],
+)
+def create_repo_environment(repo: str, environment_name: str, wait_timer: int = 0,
+                             reviewers: str = "", deployment_branch_policy: str = "") -> str:
+    try:
+        import json as j
+        payload: dict = {"deployment_branch_policy": None}
+        if wait_timer > 0:
+            payload["wait_timer"] = wait_timer
+        if reviewers:
+            reviewer_list = []
+            for r in reviewers.split(","):
+                r = r.strip()
+                if r:
+                    reviewer_list.append({"type": "Team" if r.islower() else "User", "id": None, "slug": r})
+            payload["reviewers"] = reviewer_list
+        if deployment_branch_policy:
+            payload["deployment_branch_policy"] = {"protected_branches": True, "custom_branch_policies": deployment_branch_policy == "selected"}
+        return _gh("api", f"repos/{repo}/environments/{environment_name}", "--method", "PUT",
+                    "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_repo_environment",
+    description="Delete an environment from a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "environment_name": {"type": "string", "description": "Environment name"},
+    },
+    required=["repo", "environment_name"],
+)
+def delete_repo_environment(repo: str, environment_name: str) -> str:
+    try:
+        _gh("api", f"repos/{repo}/environments/{environment_name}", "--method", "DELETE",
+            "--silent", timeout=15)
+        return f"Environment '{environment_name}' deleted from {repo}."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="list_deployment_branch_policies",
+    description="List deployment branch policies for an environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "environment_name": {"type": "string", "description": "Environment name"},
+    },
+    required=["repo", "environment_name"],
+)
+def list_deployment_branch_policies(repo: str, environment_name: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/environments/{environment_name}/deployment-branch-policies")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_deployment_branch_policy",
+    description="Create a deployment branch policy for an environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "environment_name": {"type": "string", "description": "Environment name"},
+        "name": {"type": "string", "description": "Branch name pattern (e.g., main, release/*)"},
+        "type": {"type": "string", "description": "Branch type: branch or tag"},
+    },
+    required=["repo", "environment_name", "name"],
+)
+def create_deployment_branch_policy(repo: str, environment_name: str, name: str, type: str = "branch") -> str:
+    try:
+        import json as j
+        payload = {"name": name, "type": type}
+        return _gh("api", f"repos/{repo}/environments/{environment_name}/deployment-branch-policies",
+                    "--method", "POST", "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="delete_deployment_branch_policy",
+    description="Delete a deployment branch policy for an environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "environment_name": {"type": "string", "description": "Environment name"},
+        "policy_id": {"type": "number", "description": "Policy ID"},
+    },
+    required=["repo", "environment_name", "policy_id"],
+)
+def delete_deployment_branch_policy(repo: str, environment_name: str, policy_id: int) -> str:
+    try:
+        _gh("api", f"repos/{repo}/environments/{environment_name}/deployment-branch-policies/{policy_id}",
+            "--method", "DELETE", "--silent", timeout=15)
+        return f"Deployment branch policy {policy_id} deleted."
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_environment_secrets",
+    description="List environment secrets for an environment.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "environment_name": {"type": "string", "description": "Environment name"},
+    },
+    required=["repo", "environment_name"],
+)
+def get_environment_secrets(repo: str, environment_name: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/environments/{environment_name}/secrets")
     except RuntimeError as e:
         return f"Error: {e}"
 
