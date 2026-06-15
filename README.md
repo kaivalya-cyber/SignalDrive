@@ -742,6 +742,13 @@ issues-manager "Show me open issues in this repo"
 - `set_allowed_actions`: Set the allowed actions for an organization or repository.
 - `set_org_actions_permissions`: Set the Actions permissions for an organization.
 
+#### Actions / Artifact & Cache Retention
+- `get_artifact_retention`: Get the artifact and log retention policy for a repository.
+- `get_cache_usage`: Get GitHub Actions cache usage for a repository.
+- `get_org_artifact_retention`: Get the artifact and log retention policy for an organization.
+- `set_artifact_retention`: Set the artifact and log retention period for a repository.
+- `set_org_artifact_retention`: Set the artifact and log retention period for an organization.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

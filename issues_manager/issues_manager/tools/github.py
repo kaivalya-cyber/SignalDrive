@@ -12392,6 +12392,87 @@ def list_org_required_workflows(org: str) -> str:
 
 
 @tool(
+    name="get_artifact_retention",
+    description="Get the artifact and log retention policy for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_artifact_retention(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/actions/retention")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_artifact_retention",
+    description="Set the artifact and log retention period for a repository (in days).",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "days": {"type": "string", "description": "Retention period in days (1-90)"},
+    },
+    required=["repo", "days"],
+)
+def set_artifact_retention(repo: str, days: str) -> str:
+    try:
+        import json as j
+        return _gh("api", f"repos/{repo}/actions/retention", "--method", "PUT",
+                    "--raw-field", j.dumps({"retention_days": int(days)}))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_org_artifact_retention",
+    description="Get the artifact and log retention policy for an organization.",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+    },
+    required=["org"],
+)
+def get_org_artifact_retention(org: str) -> str:
+    try:
+        return _gh("api", f"orgs/{org}/actions/retention")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="set_org_artifact_retention",
+    description="Set the artifact and log retention period for an organization (in days).",
+    parameters={
+        "org": {"type": "string", "description": "Organization name"},
+        "days": {"type": "string", "description": "Retention period in days (1-90)"},
+    },
+    required=["org", "days"],
+)
+def set_org_artifact_retention(org: str, days: str) -> str:
+    try:
+        import json as j
+        return _gh("api", f"orgs/{org}/actions/retention", "--method", "PUT",
+                    "--raw-field", j.dumps({"retention_days": int(days)}))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_cache_usage",
+    description="Get GitHub Actions cache usage for a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+    },
+    required=["repo"],
+)
+def get_cache_usage(repo: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/actions/cache/usage")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
