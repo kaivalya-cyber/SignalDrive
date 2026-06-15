@@ -780,6 +780,12 @@ issues-manager "Show me open issues in this repo"
 - `get_org_push_protection`: Get push protection status for an organization.
 - `set_repo_security_and_analysis`: Set security and analysis settings for a repository.
 
+#### Issue & PR Templates
+- `create_issue_template`: Create an issue template file in a repository.
+- `create_pr_template`: Create or update a pull request template file in a repository.
+- `create_repo_readme`: Create or update README.md in a repository.
+- `get_issue_template`: Get the content of a specific issue template file.
+
 #### GitHub Pages
 - `get_pages_info`: Get GitHub Pages site information for a repository.
 - `list_pages_builds`: List GitHub Pages builds for a repository.

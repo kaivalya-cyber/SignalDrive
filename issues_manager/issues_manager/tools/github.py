@@ -12900,6 +12900,95 @@ def set_repo_security_and_analysis(repo: str, advanced_security: str = "",
 
 
 @tool(
+    name="create_issue_template",
+    description="Create an issue template file in a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "filename": {"type": "string", "description": "Template filename (e.g., bug_report.md)"},
+        "content": {"type": "string", "description": "Template content in YAML frontmatter + Markdown"},
+        "message": {"type": "string", "description": "Commit message"},
+        "branch": {"type": "string", "description": "Branch (default: default branch)"},
+    },
+    required=["repo", "filename", "content", "message"],
+)
+def create_issue_template(repo: str, filename: str, content: str, message: str, branch: str = "") -> str:
+    try:
+        import json as j, base64
+        b64 = base64.b64encode(content.encode()).decode()
+        payload = {"message": message, "content": b64}
+        if branch:
+            payload["branch"] = branch
+        return _gh("api", f"repos/{repo}/contents/.github/ISSUE_TEMPLATE/{filename}",
+                    "--method", "PUT", "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_pr_template",
+    description="Create or update a pull request template file in a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "content": {"type": "string", "description": "Template content in Markdown"},
+        "message": {"type": "string", "description": "Commit message"},
+        "branch": {"type": "string", "description": "Branch (default: default branch)"},
+    },
+    required=["repo", "content", "message"],
+)
+def create_pr_template(repo: str, content: str, message: str, branch: str = "") -> str:
+    try:
+        import json as j, base64
+        b64 = base64.b64encode(content.encode()).decode()
+        payload = {"message": message, "content": b64}
+        if branch:
+            payload["branch"] = branch
+        return _gh("api", f"repos/{repo}/contents/.github/PULL_REQUEST_TEMPLATE.md",
+                    "--method", "PUT", "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="get_issue_template",
+    description="Get the content of a specific issue template file.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "filename": {"type": "string", "description": "Template filename"},
+    },
+    required=["repo", "filename"],
+)
+def get_issue_template(repo: str, filename: str) -> str:
+    try:
+        return _gh("api", f"repos/{repo}/contents/.github/ISSUE_TEMPLATE/{filename}")
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
+    name="create_repo_readme",
+    description="Create or update README.md in a repository.",
+    parameters={
+        "repo": {"type": "string", "description": "Owner/repo"},
+        "content": {"type": "string", "description": "README content"},
+        "message": {"type": "string", "description": "Commit message"},
+        "branch": {"type": "string", "description": "Branch (default: default branch)"},
+    },
+    required=["repo", "content", "message"],
+)
+def create_repo_readme(repo: str, content: str, message: str, branch: str = "") -> str:
+    try:
+        import json as j, base64
+        b64 = base64.b64encode(content.encode()).decode()
+        payload = {"message": message, "content": b64}
+        if branch:
+            payload["branch"] = branch
+        return _gh("api", f"repos/{repo}/contents/README.md",
+                    "--method", "PUT", "--raw-field", j.dumps(payload))
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+
+@tool(
     name="list_tools",
     description="List all available tools in the GitHub Issues Manager with descriptions.",
     parameters={
